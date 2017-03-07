@@ -1,0 +1,17 @@
+---
+
+- name: upgrade all packages
+  yum:
+    name: '*'
+    state: latest
+  become: yes
+
+- name: install needed yum packages
+  yum: name={{item}} state=present
+  with_items:
+  - vim
+  - python
+  - python-pip
+  - gcc
+  - python-devel
+  become: yes

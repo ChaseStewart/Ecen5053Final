@@ -1,0 +1,10 @@
+---
+
+- name: setup target RPi to run the hub code
+  hosts: localhost
+  connection: local
+
+  roles:
+    - common # run the common install job
+    - mysql # setup mysql on box
+    - webserver # setup webserver 

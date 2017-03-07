@@ -1,2 +1,4 @@
 # Ecen5053Final
-Super project for Embedded Interface design
+
+
+* Chase E Stewart and Mounika Reddy's Super project for Embedded Interface design
