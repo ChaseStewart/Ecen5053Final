@@ -35,24 +35,24 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
 	if "arm_status" in message:
 		print("Getting Arm Status User")
 		db = MySQLdb.connect(host="localhost",user="root",db="users_data")
-		db.query("""SELECT ref.name FROM arm_status a_s LEFT JOIN ref_arm_state ref ON ref.id = a_s.arm_state ORDER BY a_s.timestamp ASC limit 1""")
+		db.query("""SELECT ref.name FROM arm_status a_s LEFT JOIN ref_arm_state ref ON ref.id = a_s.arm_state ORDER BY a_s.timestamp DESC limit 1""")
 		
 		result = db.store_result()
 		output= result.fetch_row()[0][0]
 		print("Results: "+str(output))
-		self.write_message(output)	
+		self.write_message("state:"+output+"\r\n")	
 
 	if "login_status" in message:
 			
 		print("Getting Logged-in User")
 		# do query
 		db = MySQLdb.connect(host="localhost",user="root",db="users_data")
-		db.query("""SELECT name FROM logged_in_users ORDER BY timestamp ASC limit 1""")
+		db.query("""SELECT name FROM logged_in_users ORDER BY timestamp DESC limit 1""")
 		result = db.store_result()
 		
 		output= result.fetch_row()[0][0]
 		print("Results: "+str(output))
-		self.write_message(output)	
+		self.write_message("name:"+output+"\r\n")	
 
  
     def on_close(self):
