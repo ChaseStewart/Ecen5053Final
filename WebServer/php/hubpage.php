@@ -1,9 +1,6 @@
+<!-- hub landing page-->
 <html>
-
-
-
 	<head>
-
 		<title>Chase and Mounika Project 2</title>
 
 		<meta charset="utf-8">
@@ -11,7 +8,6 @@
 		<meta http-equiv="X-UA-Compatible" content="IE=edge">
 
 		<link rel="stylesheet" href="http://s3.amazonaws.com/codecademy-content/courses/ltp/css/bootstrap.css">
-
 
 	</head>
 
@@ -26,18 +22,20 @@
 		<div class="row">
 		<div class="row" style="margin-top: 10px;">
 			<div class="col-md-2"></div>
-			
+			<!--to connect to the databse and get data to display in the table -->
 			<?php
+                                /* details to connect to database*/
 				$host = "localhost";
 				$user = "root";
 				$db_name= "users_data";
+                                /* connect to sql**/
 				$con = mysql_connect($host, $user);
-
 				if (!$con) 
 				{ 
 					die('Could not connect: ' . mysql_error()); 
 				} 
-				mysql_select_db('users_data'); 
+				/* connect to mysql*/
+                                mysql_select_db('users_data'); 
 				$sql='SELECT name FROM logged_in_users ORDER BY timestamp DESC limit 1 ';
 			
 				//execute the SQL query and return records
@@ -73,15 +71,16 @@
 		</div>
 		<div class="row" >
 			<div class="col-md-4"></div>
-			<div class="col-md-4">
+			<div class="col-md-6">
 				<button class="btn btn-info btn-lg" onclick="window.location='users_data.php'">Users</button><br /><br />
 				<button class="btn btn-info btn-lg" onclick="alert('Not yet implemented!');">Lights</button><br /><br />
-				<button class="btn btn-info btn-lg" onclick="alert('Not yet implemented!');">Music</button><br /><br />
+				<!--<button class="btn btn-info btn-lg" onclick="alert('Not yet implemented!');">Music</button><br /><br /> -->
 				<button class="btn btn-info btn-lg" onclick="alert('Not yet implemented!');">Stats</button><br /><br />
 				<button class="btn btn-info btn-lg" onclick="alert('Not yet implemented!');">Settings</button>
 			</div>
-			<div class="col-md-4"></div>
+			<div class="col-md-2"></div>
 		</div>
+       
 	</div>
 
 	</body>
