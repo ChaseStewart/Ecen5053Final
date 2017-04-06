@@ -6,46 +6,93 @@ from tornado import gen
 from tornado.websocket import websocket_connect
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import QTimer
-import sys
+from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
+import sys, json
 
 
-class Hub(QtGui.QMainWindow):
+class Access(QtGui.QMainWindow):
     """
     The top-level class of the project2 Hub R Pi GUI-
     Controls everything on the R Pi for this demo
     """
 
-    def __init__(self):
+    def __init__(self, use_websockets=False):
         """
         Setup the GUI, setup the Websockets Connection,
         provide timer and button callback updates, and display info
         """
+	self.use_websockets=use_websockets
 
-        super(Hub,self).__init__()
+        super(Access,self).__init__()
 
 	# connection variables
-        self.url = "ws://52.34.209.113:8080/websocket"
+        self.ws_url = "ws://52.34.209.113:8080/websocket"
         self.ws_timeout  = 500
-        self.gui_timeout = 250 
+        self.ws_gui_timeout = 250 
         self.first_time=True
         self.drop_count = 0
         self.toggle = 0
 
 	# Tornado Variables
-        self.ioloop = IOLoop.instance()
+        self.ws_ioloop = IOLoop.instance()
         self.ws = None
 
 	# initalize the GUI
         self.initUI()
 
-	# Connect to the Websockets server
-        self.connect()
 	
-	# setup the Websocket IO Loop
-	self.my_p_callback = PeriodicCallback(self.keep_alive, self.ws_timeout, io_loop=self.ioloop)
-	self.my_p_callback.start()
-        self.ioloop.start()
+        if self.use_websockets: 
+            # Connect to the Websockets server
+            #self.connect()
         
+            # setup the Websocket IO Loop
+            self.my_p_callback = PeriodicCallback(self.keep_alive, self.ws_timeout, io_loop=self.ioloop)
+            self.my_p_callback.start()
+            self.ioloop.start()
+        else:
+            self.rootCAPath="/home/pi/Desktop/root-CA.crt"
+            self.privateKeyPath="/home/pi/Desktop/Access01.private.key"
+            self.certificatePath="/home/pi/Desktop/Access01.cert.pem"
+            self.host="a1qhmcyp5eh8yq.iot.us-west-2.amazonaws.com"
+
+            self.setupAWS()
+
+
+
+    def cbkLoggedInUser(self, client, userdata, message):
+        print("Received a new message: ")
+        my_user = json.loads(message.payload)['message']
+        print(my_user)
+        self.user_data.setText("Welcome, "+str(my_user))
+
+
+
+    def setupAWS(self):
+
+        self.myAWSIoTMQTTClient = AWSIoTMQTTClient("basicPubSub")
+        self.myAWSIoTMQTTClient.configureEndpoint(self.host, 8883)
+        self.myAWSIoTMQTTClient.configureCredentials(self.rootCAPath, self.privateKeyPath, self.certificatePath)
+
+        # AWSIoTMQTTClient connection configuration
+        self.myAWSIoTMQTTClient.configureAutoReconnectBackoffTime(1, 32, 20)
+        self.myAWSIoTMQTTClient.configureOfflinePublishQueueing(-1)  # Infinite offline Publish queueing
+        self.myAWSIoTMQTTClient.configureDrainingFrequency(2)  # Draining: 2 Hz
+        self.myAWSIoTMQTTClient.configureConnectDisconnectTimeout(10)  # 10 sec
+        self.myAWSIoTMQTTClient.configureMQTTOperationTimeout(5)  # 5 sec
+        
+        # Connect and subscribe to AWS IoT
+        self.myAWSIoTMQTTClient.connect()
+        self.myAWSIoTMQTTClient.subscribe("AccessControl/LoggedInUser", 1, self.cbkLoggedInUser)
+       
+
+
+    def pubAccessState(self, state):
+        armData = {}
+        armData['armState']=str(state) 
+        jsonData = json.dumps(armData)
+        self.myAWSIoTMQTTClient.publish("AccessControl/armState", str(jsonData), 1)
+
+
         
     def initUI(self):
         """ 
@@ -112,23 +159,29 @@ class Hub(QtGui.QMainWindow):
         Change the state of the Arm_status table in MySQL to 'armed'
         """
 
-        if self.ws is None:
-            self.connect()
-        else:
-            print("ARM SYSTEM")        
-            self.ws.write_message("set_arm")
+        print("ARM SYSTEM")        
+        self.pubAccessState(state="Armed")
+        
+        #if self.ws is None:
+        #    self.connect()
+        #else:
+        #    print("ARM SYSTEM")        
+        #    self.ws.write_message("set_arm")
 
 
     def sendDisarm(self):
         """
         Change the state of the Arm_status table in MySQL to 'disarmed'
         """
+        
+        print("DISARM SYSTEM")        
+        self.pubAccessState(state="Disarmed")
 
-        if self.ws is None:
-            self.connect()
-        else:
-            print("DISARM SYSTEM")        
-            self.ws.write_message("set_dis")
+        #if self.ws is None:
+        #    self.connect()
+        #else:
+        #    print("DISARM SYSTEM")        
+        #    self.ws.write_message("set_dis")
 
         
     @gen.coroutine
@@ -230,5 +283,5 @@ class Hub(QtGui.QMainWindow):
 if __name__ == "__main__":
     """ Run program if called as main function """
     app = QtGui.QApplication(sys.argv)
-    hub=Hub()
+    access=Access()
     sys.exit(app.exec_())
