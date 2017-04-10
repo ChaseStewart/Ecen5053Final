@@ -51,8 +51,8 @@ class Hub(QtGui.QMainWindow):
 
         else:
             self.rootCAPath="/home/pi/Desktop/root-CA.crt"
-            self.privateKeyPath="/home/pi/Desktop/Access01.private.key"
-            self.certificatePath="/home/pi/Desktop/Access01.cert.pem"
+            self.privateKeyPath="/home/pi/Desktop/Hub01.private.key"
+            self.certificatePath="/home/pi/Desktop/Hub01.cert.pem"
             self.host="a1qhmcyp5eh8yq.iot.us-west-2.amazonaws.com"
 
             self.setupAWS()
@@ -60,7 +60,11 @@ class Hub(QtGui.QMainWindow):
     
     def cbkLoggedInUser(self, client, userdata, message):
         print("Received a new message: ")
-        my_user = json.loads(message.payload)['message']
+        try:
+            my_user = json.loads(message.payload)['message']
+        except:
+            print("INVALID MESSAGE: "+json.loads(message.payload))
+            return
         print(my_user)
         self.user_data.setText("Welcome, "+str(my_user))
     
@@ -70,13 +74,17 @@ class Hub(QtGui.QMainWindow):
         print("Received armState: ")
         arm_state = json.loads(message.payload)['armState']
         print(arm_state)
-        self.user_data.setText("Arm state is: "+str(arm_state))
+        self.state.setText("Arm state is: "+str(arm_state))
         if arm_state == "Armed":
             self.is_armed = True
+            self.Arm_btn.hide()
+            self.Disarm_btn.hide()
         elif arm_state == "Disarmed":
             self.is_armed = False
+            self.Arm_btn.show()
+            self.Disarm_btn.show()
         else:
-            print "Error: INVALID STATE"
+            print "Error: INVALID STATE. Need 'Armed' or 'Disarmed' "
             return
 
 
@@ -114,12 +122,12 @@ class Hub(QtGui.QMainWindow):
 	# Create user-name label
         self.user_data=QtGui.QLabel(self)
         self.user_data.setFont(font)
-        self.user_data.setText("Name")
+        self.user_data.setText("No Logged In User")
 
 	# Create alarm-state label
         self.state=QtGui.QLabel(self)
         self.state.setFont(font)
-        self.state.setText("State")
+        self.state.setText("Arm state is: Armed")
 	self.state.setStyleSheet("color: blue")
 
 	# Create status bar
@@ -127,12 +135,14 @@ class Hub(QtGui.QMainWindow):
 	self.statusBar().setStyleSheet("color: red; font-size:18pt")
 
 	# Create Arm button        
-	Arm_btn=QtGui.QPushButton("Arm",self)
-        Arm_btn.clicked.connect(self.sendArm)
-	
+	self.Arm_btn=QtGui.QPushButton("LEDs On",self)
+        self.Arm_btn.clicked.connect(self.sendLEDsOn)
+        self.Arm_btn.hide()
+
 	# Create Disarm button        
-	Disarm_btn=QtGui.QPushButton("Disarm",self)
-        Disarm_btn.clicked.connect(self.sendDisarm)
+	self.Disarm_btn=QtGui.QPushButton("LEDs Off",self)
+        self.Disarm_btn.clicked.connect(self.sendLEDsOff)
+        self.Disarm_btn.hide()
 
 	# Now create layout
 
@@ -141,8 +151,8 @@ class Hub(QtGui.QMainWindow):
 
 	# put buttons in an hbox
 	hbox = QtGui.QHBoxLayout()
-        hbox.addWidget(Arm_btn)
-        hbox.addWidget(Disarm_btn)
+        hbox.addWidget(self.Arm_btn)
+        hbox.addWidget(self.Disarm_btn)
         
 	# put buttons + status in a vbox
 	vbox = QtGui.QVBoxLayout()
@@ -159,24 +169,27 @@ class Hub(QtGui.QMainWindow):
 
 
         
-    def sendArm(self):
+    def sendLEDsOn(self):
         """
         Change the state of the Arm_status table in MySQL to 'armed'
         """
 
+        print("TODO SET LEDS ON")
+        self.state.setText('Would have set LEDs ON')
         if self.ws is None:
-            #self.connect()
             pass
         else:
             print("ARM SYSTEM")        
             #self.ws.write_message("set_arm")
 
 
-    def sendDisarm(self):
+    def sendLEDsOff(self):
         """
         Change the state of the Arm_status table in MySQL to 'disarmed'
         """
 
+        self.state.setText('Would have set LEDs OFF')
+        print("TODO SET LEDS OFF")
         if self.ws is None:
             #self.connect()
             pass
