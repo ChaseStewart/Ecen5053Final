@@ -7,6 +7,8 @@ from tornado.websocket import websocket_connect
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import QTimer
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
+import fingerpi as fpi
+
 import sys, json
 
 
@@ -93,6 +95,15 @@ class Access(QtGui.QMainWindow):
         self.myAWSIoTMQTTClient.publish("AccessControl/armState", str(jsonData), 1)
 
 
+
+    def pubLoggedInUser(self, uname, passwd):
+        unameData = {}
+        unameData['uname']=str(uname)
+        unameData['passwd']=str(passwd)
+        jsonData = json.dumps(unameData)
+        self.myAWSIoTMQTTClient.publish("AccessControl/loggedInUser", str(jsonData), 1)
+
+
         
     def initUI(self):
         """ 
@@ -117,6 +128,36 @@ class Access(QtGui.QMainWindow):
         self.state.setText("State")
 	self.state.setStyleSheet("color: blue")
 
+        # Label for username
+        self.input1Label=QtGui.QLabel(self)
+        self.input1Label.setText("Username")
+
+        # Create text input
+        self.input1=QtGui.QLineEdit(self)
+        #self.input1.setHint("Username")
+	
+        self.unamebox = QtGui.QHBoxLayout()
+        self.unamebox.addWidget(self.input1Label)
+        self.unamebox.addWidget(self.input1)
+
+        # Label for username
+        self.input2Label=QtGui.QLabel(self)
+        self.input2Label.setText("Password")
+
+        # Create text input
+        self.input2=QtGui.QLineEdit(self)
+        self.input2.setEchoMode(QtGui.QLineEdit.Password)
+        #self.input2.setHint("Password")
+
+	# Password Button
+	self.Submit_btn=QtGui.QPushButton("Submit", self)
+	self.Submit_btn.clicked.connect(self.sendLoggedInUser)
+        
+        self.passwdbox = QtGui.QHBoxLayout()
+        self.passwdbox.addWidget(self.input2Label)
+        self.passwdbox.addWidget(self.input2)
+        self.passwdbox.addWidget(self.Submit_btn)
+
 	# Create status bar
 	self.statusBar()
 	self.statusBar().setStyleSheet("color: red; font-size:18pt")
@@ -128,6 +169,8 @@ class Access(QtGui.QMainWindow):
 	# Create Disarm button        
 	Disarm_btn=QtGui.QPushButton("Disarm",self)
         Disarm_btn.clicked.connect(self.sendDisarm)
+
+
 
 	# Now create layout
 
@@ -143,6 +186,8 @@ class Access(QtGui.QMainWindow):
 	vbox = QtGui.QVBoxLayout()
         vbox.addWidget(self.user_data)
         vbox.addWidget(self.state)
+        vbox.addLayout(self.unamebox)
+        vbox.addLayout(self.passwdbox)
     
         # combine layouts
         vbox.addLayout(hbox)
@@ -152,6 +197,12 @@ class Access(QtGui.QMainWindow):
         self.setWindowTitle('Project 2 Demo')
         self.show()
 
+
+    def sendLoggedInUser(self):
+        print("SEND USER")
+        uname =self.input1.text()
+        passwd=self.input2.text()
+        self.pubLoggedInUser(uname, passwd)
 
         
     def sendArm(self):
