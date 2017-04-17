@@ -1,15 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import sys, json
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado import gen
 from tornado.websocket import websocket_connect
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import QTimer
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
-import fingerpi as fpi
+from boto3.session import Session
 
-import sys, json
+import fingerpi as fpi
 
 
 class Access(QtGui.QMainWindow):
@@ -56,16 +57,12 @@ class Access(QtGui.QMainWindow):
             self.privateKeyPath="/home/pi/Desktop/Access01.private.key"
             self.certificatePath="/home/pi/Desktop/Access01.cert.pem"
             self.host="a1qhmcyp5eh8yq.iot.us-west-2.amazonaws.com"
-
             self.setupAWS()
 
-
-
-    def cbkLoggedInUser(self, client, userdata, message):
-        print("Received a new message: ")
-        my_user = json.loads(message.payload)['message']
-        print(my_user)
-        self.user_data.setText("Welcome, "+str(my_user))
+            self.WORK_PERIOD = 2000 
+            self.myTimer = QTimer()
+            self.myTimer.connect(self.processSQS)
+            self.myTimer.start(self.WORK_PERIOD)
 
 
 
@@ -84,27 +81,88 @@ class Access(QtGui.QMainWindow):
         
         # Connect and subscribe to AWS IoT
         self.myAWSIoTMQTTClient.connect()
-        self.myAWSIoTMQTTClient.subscribe("AccessControl/LoggedInUser", 1, self.cbkLoggedInUser)
-       
+
+	# Connect to the SQS Queue
+        try:
+            self.session = Session()
+        except:
+            print("Need to configure AWS- exit and run 'aws configure' ")
+            sys.exit(-1)
+
+        self.client  = self.session.client('sqs')
+	self.queue   = self.client.get_queue_url(QueueName="Access_Messages")['QueueUrl']
 
 
-    def pubAccessState(self, state):
-        armData = {}
-        armData['armState']=str(state) 
-        jsonData = json.dumps(armData)
-        self.myAWSIoTMQTTClient.publish("AccessControl/armState", str(jsonData), 1)
 
-
-
-    def pubLoggedInUser(self, uname, passwd):
-        unameData = {}
-        unameData['uname']=str(uname)
-        unameData['passwd']=str(passwd)
-        jsonData = json.dumps(unameData)
-        self.myAWSIoTMQTTClient.publish("AccessControl/loggedInUser", str(jsonData), 1)
-
-
+    def processSQS(self):
+        """
+        Process messages from the queue
+        """
         
+        acked_messages = []
+        
+        # Pull Messages
+        self.messages = self.client.receive_message( 
+            QueueUrl = self.queue,
+            AttributeNames = ['ReceiptHandle','body'],
+            MaxNumberOfMessages = 10,
+            VisibilityTimeout = 60,
+            WaitTimeSeconds = 1	)
+
+        # Handle message
+        if self.messages.get('Messages'):
+            m = self.messages.get('Messages')
+            for msg in m:
+                body   = msg['Body']
+                acked_messages.append(msg['ReceiptHandle'])
+                
+
+
+            # Now delete the ack'ed message
+            for item in acked_messages:
+                self.client.delete_message(QueueUrl=self.queue, ReceiptHandle=item)
+
+        # otherwise just return
+        else:
+            return
+`
+
+ 
+    def pubFingerprint(self, state, uname):
+        """
+        Publish Fingerprint Authentication results to AWS        
+        """
+
+        armData = {}
+        if uname == None:
+            uname="None"
+        armData['state']=str(state) 
+        armData['user_id']  =str(uname) 
+        jsonData = json.dumps(armData)
+        print("PUB FINGERPRINT\n\tSending state:%s, user_id:%s" % (state, uname))
+        self.myAWSIoTMQTTClient.publish("AccessControl/Fingerprint", str(jsonData), 1)
+
+
+
+    def pubUserPass(self, uname, passwd):
+        """
+        Publish the username and password info to AWS in order to validate
+        """
+
+        if len(uname) < 5 or len(passwd) < 5:
+            self.statusBar().showMessage('Username and Password must each be > 5 chars!')
+            return
+
+        unameData = {}
+        unameData['user_name']=str(uname)
+        unameData['password']=str(passwd)
+        jsonData = json.dumps(unameData)
+
+        print("PUB USER PASS\n\tSending user:%s, password:%s" % (uname, "*"*(len(passwd)-4)+passwd[-3:]))
+        self.myAWSIoTMQTTClient.publish("AccessControl/UserPass", str(jsonData), 1)
+
+
+
     def initUI(self):
         """ 
         Initialize + configure all QT modules used in the GUI
@@ -120,13 +178,13 @@ class Access(QtGui.QMainWindow):
 	# Create user-name label
         self.user_data=QtGui.QLabel(self)
         self.user_data.setFont(font)
-        self.user_data.setText("Name")
+        self.user_data.setText("")
 
 	# Create alarm-state label
         self.state=QtGui.QLabel(self)
         self.state.setFont(font)
-        self.state.setText("State")
-	self.state.setStyleSheet("color: blue")
+        self.state.setText("System is ARMED")
+	self.state.setStyleSheet("color: red")
 
         # Label for username
         self.input1Label=QtGui.QLabel(self)
@@ -163,12 +221,12 @@ class Access(QtGui.QMainWindow):
 	self.statusBar().setStyleSheet("color: red; font-size:18pt")
 
 	# Create Arm button        
-	Arm_btn=QtGui.QPushButton("Arm",self)
-        Arm_btn.clicked.connect(self.sendArm)
+	Arm_btn=QtGui.QPushButton("Fingerprint Fail",self)
+        Arm_btn.clicked.connect(self.simFingerprintFailure)
 	
 	# Create Disarm button        
-	Disarm_btn=QtGui.QPushButton("Disarm",self)
-        Disarm_btn.clicked.connect(self.sendDisarm)
+	Disarm_btn=QtGui.QPushButton("Fingerprint Success",self)
+        Disarm_btn.clicked.connect(self.simFingerprintSuccess)
 
 
 
@@ -199,42 +257,39 @@ class Access(QtGui.QMainWindow):
 
 
     def sendLoggedInUser(self):
-        print("SEND USER")
+        """
+        Send (username, password) pair to AWS for authentication
+        """
         uname =self.input1.text()
         passwd=self.input2.text()
-        self.pubLoggedInUser(uname, passwd)
+        self.pubUserPass(uname, passwd)
+        return
 
-        
-    def sendArm(self):
+
+
+    def simFingerprintSuccess(self):
         """
-        Change the state of the Arm_status table in MySQL to 'armed'
+        Change the state of the Arm_status table in MySQL to 'disarmed' and set current user
         """
-
-        print("ARM SYSTEM")        
-        self.pubAccessState(state="Armed")
-        
-        #if self.ws is None:
-        #    self.connect()
-        #else:
-        #    print("ARM SYSTEM")        
-        #    self.ws.write_message("set_arm")
+        rand_ID = int(numpy.floor(numpy.random.uniform(0,5)))
+        self.pubFingerprint(state="Success", uname=rand_ID)
+            self.WORK_PERIOD = 2000 
+            self.myTimer = QTimer()
+            self.myTimer.connect(self.processSQS)
+            self.myTimer.start(self.WORK_PERIOD)
+        return
 
 
-    def sendDisarm(self):
+
+    def simFingerprintFailure(self):
         """
         Change the state of the Arm_status table in MySQL to 'disarmed'
         """
-        
-        print("DISARM SYSTEM")        
-        self.pubAccessState(state="Disarmed")
+        self.pubFingerprint(state="Failure", uname=None)
+        return
 
-        #if self.ws is None:
-        #    self.connect()
-        #else:
-        #    print("DISARM SYSTEM")        
-        #    self.ws.write_message("set_dis")
 
-        
+ 
     @gen.coroutine
     def connect(self):
         """
@@ -322,13 +377,15 @@ class Access(QtGui.QMainWindow):
             self.ioloop.stop()
             self.my_p_callback.stop()
             QTimer.singleShot(self.gui_timeout, self.poll_websockets)
-            
+
+
 
     def poll_websockets(self):
         """ Take control from GUI for websockets"""
 
         self.my_p_callback.start()
         self.ioloop.start()
+
 
 
 if __name__ == "__main__":

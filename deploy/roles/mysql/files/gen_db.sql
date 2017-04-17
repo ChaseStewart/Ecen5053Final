@@ -17,17 +17,19 @@ CREATE TABLE arm_status (timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP, arm_stat
 
 -- create reference access table for join queries
 CREATE TABLE ref_access_table (id TINYINT(1), name VARCHAR(20));
-insert into ref_access_table (id, name) VALUE (3, "Admin"); 
-insert into ref_access_table (id, name) VALUE (2, "Reserved"); 
-insert into ref_access_table (id, name) VALUE (1, "Child"); 
-insert into ref_access_table (id, name) VALUE (0, "User"); 
+insert into ref_access_table (id, name) VALUE (4, "Admin"); 
+insert into ref_access_table (id, name) VALUE (3, "Reserved"); 
+insert into ref_access_table (id, name) VALUE (2, "Child"); 
+insert into ref_access_table (id, name) VALUE (1, "User"); 
+insert into ref_access_table (id, name) VALUE (0, "None"); 
 
 -- create reference arm/disarm table for join queries
 CREATE TABLE ref_arm_state    (id TINYINT(1), name VARCHAR(20));
 insert into ref_arm_state (id, name) VALUE (0, "Armed");
 insert into ref_arm_state (id, name) VALUE (1, "Disarmed");
 
-
+-- create fingerprint user to ID table
+CREATE TABLE fingerprint_users (name varchar(20), fpi_idx INT NOT NULL AUTO_INCREMENT, primary key (fpi_idx));
 
 -- then create the user
 CREATE USER 'rpi'@'128.138.%' IDENTIFIED BY 'mounika';

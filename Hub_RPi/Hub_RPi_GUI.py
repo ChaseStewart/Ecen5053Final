@@ -1,13 +1,14 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*
 
+import sys, json, numpy
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado import gen
 from tornado.websocket import websocket_connect
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import QTimer
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
-import sys, json
+from boto3.session import Session
 
 
 class Hub(QtGui.QMainWindow):
@@ -51,13 +52,80 @@ class Hub(QtGui.QMainWindow):
 
         else:
             self.rootCAPath="/home/pi/Desktop/root-CA.crt"
-            self.privateKeyPath="/home/pi/Desktop/Hub01.private.key"
-            self.certificatePath="/home/pi/Desktop/Hub01.cert.pem"
+            self.privateKeyPath="/home/pi/Desktop/Access01.private.key"
+            self.certificatePath="/home/pi/Desktop/Access01.cert.pem"
             self.host="a1qhmcyp5eh8yq.iot.us-west-2.amazonaws.com"
 
             self.setupAWS()
+  
+            self.WORK_PERIOD = 2000 
+            self.myTimer = QTimer()
+            self.myTimer.timeout.connect(self.processSQS)
+            self.myTimer.start(self.WORK_PERIOD)
 
-    
+
+    def setupAWS(self):
+
+        # Setup AWS IoT basics
+        self.myAWSIoTMQTTClient = AWSIoTMQTTClient("basicPubSub")
+        self.myAWSIoTMQTTClient.configureEndpoint(self.host, 8883)
+        self.myAWSIoTMQTTClient.configureCredentials(self.rootCAPath, self.privateKeyPath, self.certificatePath)
+
+        # AWSIoTMQTTClient connection configuration
+        self.myAWSIoTMQTTClient.configureAutoReconnectBackoffTime(1, 32, 20)
+        self.myAWSIoTMQTTClient.configureOfflinePublishQueueing(-1)  # Infinite offline Publish queueing
+        self.myAWSIoTMQTTClient.configureDrainingFrequency(2)  # Draining: 2 Hz
+        self.myAWSIoTMQTTClient.configureConnectDisconnectTimeout(10)  # 10 sec
+        self.myAWSIoTMQTTClient.configureMQTTOperationTimeout(5)  # 5 sec
+        
+        # Connect and subscribe to AWS IoT
+        self.myAWSIoTMQTTClient.connect()
+
+	# Connect to the SQS Queue
+        try:
+            self.session = Session()
+        except:
+            print("Need to configure AWS- exit and run 'aws configure' ")
+            sys.exit(-1)
+        
+        self.client  = self.session.client('sqs')
+	self.queue   = self.client.get_queue_url(QueueName="Hub_Messages")['QueueUrl']
+
+
+
+    def processSQS(self):
+        """
+        Process messages from the queue
+        """
+
+        acked_messages = []
+        
+
+        # Pull Messages
+        self.messages = self.client.receive_message( 
+            QueueUrl = self.queue,
+            AttributeNames = ['ReceiptHandle','body'],
+            MaxNumberOfMessages = 10,
+            VisibilityTimeout = 60,
+            WaitTimeSeconds = 1	)
+
+        # Handle message
+        if self.messages.get('Messages'):
+            m = self.messages.get('Messages')
+            for msg in m:
+                body   = msg['Body']
+                acked_messages.append(msg['ReceiptHandle'])
+		print body
+
+            # Now delete the ack'ed message
+            for item in acked_messages:
+                self.client.delete_message(QueueUrl=self.queue, ReceiptHandle=item)
+
+        # otherwise just return
+        else:
+            return
+
+
     def cbkLoggedInUser(self, client, userdata, message):
         print("Received a new message: ")
         try:
@@ -72,7 +140,11 @@ class Hub(QtGui.QMainWindow):
 
     def cbkArmState(self, client, userdata, message):
         print("Received armState: ")
-        arm_state = json.loads(message.payload)['armState']
+        try:
+            arm_state = json.loads(message.payload)['armState']
+        except:
+            print("ERROR")
+            return
         print(arm_state)
         self.state.setText("Arm state is: "+str(arm_state))
         if arm_state == "Armed":
@@ -87,26 +159,7 @@ class Hub(QtGui.QMainWindow):
             print "Error: INVALID STATE. Need 'Armed' or 'Disarmed' "
             return
 
-
-    def setupAWS(self):
-
-        self.myAWSIoTMQTTClient = AWSIoTMQTTClient("basicPubSub")
-        self.myAWSIoTMQTTClient.configureEndpoint(self.host, 8883)
-        self.myAWSIoTMQTTClient.configureCredentials(self.rootCAPath, self.privateKeyPath, self.certificatePath)
-
-        # AWSIoTMQTTClient connection configuration
-        self.myAWSIoTMQTTClient.configureAutoReconnectBackoffTime(1, 32, 20)
-        self.myAWSIoTMQTTClient.configureOfflinePublishQueueing(-1)  # Infinite offline Publish queueing
-        self.myAWSIoTMQTTClient.configureDrainingFrequency(2)  # Draining: 2 Hz
-        self.myAWSIoTMQTTClient.configureConnectDisconnectTimeout(10)  # 10 sec
-        self.myAWSIoTMQTTClient.configureMQTTOperationTimeout(5)  # 5 sec
-        
-        # Connect and subscribe to AWS IoT
-        self.myAWSIoTMQTTClient.connect()
-        self.myAWSIoTMQTTClient.subscribe("AccessControl/LoggedInUser", 1, self.cbkLoggedInUser)
-        self.myAWSIoTMQTTClient.subscribe("AccessControl/armState", 1, self.cbkArmState)
-    
-        
+ 
     def initUI(self):
         """ 
         Initialize + configure all QT modules used in the GUI
@@ -145,7 +198,6 @@ class Hub(QtGui.QMainWindow):
         self.Disarm_btn.hide()
 
 	# Now create layout
-
         wid = QtGui.QWidget(self)
         self.setCentralWidget(wid)
 
