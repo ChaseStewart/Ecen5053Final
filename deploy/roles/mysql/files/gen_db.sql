@@ -29,7 +29,8 @@ insert into ref_arm_state (id, name) VALUE (0, "Armed");
 insert into ref_arm_state (id, name) VALUE (1, "Disarmed");
 
 -- create fingerprint user to ID table
-CREATE TABLE fingerprint_users (name varchar(20), fpi_idx INT NOT NULL AUTO_INCREMENT, primary key (fpi_idx));
+CREATE TABLE fingerprint_users (name varchar(20) NOT NULL, fpi_idx INT  NOT NULL, primary key (fpi_idx) ) ;
+
 
 -- then create the user
 CREATE USER 'rpi'@'128.138.%' IDENTIFIED BY 'mounika';
