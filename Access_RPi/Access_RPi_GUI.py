@@ -10,8 +10,59 @@ from PyQt4.QtCore import QTimer
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from boto3.session import Session
 
-import fingerpi as fpi
+#import fingerpi as fpi
+from Verify import verifier
+from Enroll import enrolling
+from Delete import Deleting
 
+class Enrolling(QtGui.QMainWindow):
+	def __init__(self,parent=None):
+                self.Enroll_result= None
+                self.Delete_result=None
+        	super(Enrolling,self).__init__(parent)
+
+                self.addUser_btn=QtGui.QPushButton("Add User",self)
+                self.addUser_btn.clicked.connect(self.Enroll)
+
+                self.deleteUser_btn=QtGui.QPushButton("Delete User",self)
+                self.deleteUser_btn.clicked.connect(self.Delete)
+
+                self.name_lbl=QtGui.QLabel(self)
+                self.name_lbl.setText("Name")
+
+                self.Enteredname=QtGui.QLineEdit(self)
+                self.Enteredname.setPlaceholderText("Enter user name")
+
+                self.buttonbox=QtGui.QVBoxLayout()
+                self.buttonbox.addWidget(self.addUser_btn)
+                self.buttonbox.addWidget(self.deleteUser_btn)
+                self.hBox=QtGui.QHBoxLayout()
+                self.Labelbox = QtGui.QHBoxLayout()
+                self.Labelbox.addWidget(self.name_lbl)
+                self.Labelbox.addWidget(self.Enteredname)
+                self.hBox.addLayout(self.Labelbox)
+                self.hBox.addLayout(self.buttonbox)
+                wid = QtGui.QWidget(self)
+                self.setCentralWidget(wid)
+                wid.setLayout(self.hBox)
+                self.setGeometry(50,50,600,400)
+                self.show()
+
+	def Enroll(self):
+        	my_Enroll = enrolling()
+                self.Enroll_result = my_Enroll.runscript()
+        	if self.Enroll_result is None:
+        		self.statusBar().showMessage("Registration Unsuccessful")	
+        	else:
+			
+        		self.statusBar().showMessage("Registration Successful")
+	def Delete(self):
+		my_Delete = Deleting()
+		self.Delete_result = my_Delete.runscript()
+		if self.Delete_result is None:
+			self.statusBar().showMessage("Deletion failed")
+		else:
+			self.statusBar().showMessage("Deleted successfully")
 
 class Access(QtGui.QMainWindow):
     """
@@ -39,6 +90,9 @@ class Access(QtGui.QMainWindow):
 	# Tornado Variables
         self.ws_ioloop = IOLoop.instance()
         self.ws = None
+
+        # verify Variables
+        self.verify_result=None
 
 	# initalize the GUI
         self.initUI()
@@ -228,10 +282,7 @@ class Access(QtGui.QMainWindow):
 	Disarm_btn=QtGui.QPushButton("Fingerprint Success",self)
         Disarm_btn.clicked.connect(self.simFingerprintSuccess)
 
-
-
 	# Now create layout
-
         wid = QtGui.QWidget(self)
         self.setCentralWidget(wid)
 
@@ -246,14 +297,31 @@ class Access(QtGui.QMainWindow):
         vbox.addWidget(self.state)
         vbox.addLayout(self.unamebox)
         vbox.addLayout(self.passwdbox)
-    
+        
+        #fingerprint button
+        fingerprintbox = QtGui.QVBoxLayout()
+        fingerprintbox.addWidget(self.fingerprint_btn)
+        fingerprintbox.addLayout(vbox)
         # combine layouts
-        vbox.addLayout(hbox)
-	wid.setLayout(vbox)
+        fingerprintbox.addLayout(hbox)
+	wid.setLayout(fingerprintbox)
 
         self.setGeometry(50,50,600,400)
         self.setWindowTitle('Project 2 Demo')
         self.show()
+    
+    def verify(self):
+        my_verify = verifier()
+        print("Verification")
+        self.verify_result = my_verify.runscript()
+        if self.verify_result is None:
+    		self.pubAccessState("Armed")
+        	self.statusBar().showMessage("Access Denied")	
+        else:
+    		self.pubAccessState("Disarmed")
+		self.hide()
+        	self.newWindow= Enrolling(self)
+                
 
 
     def sendLoggedInUser(self):
