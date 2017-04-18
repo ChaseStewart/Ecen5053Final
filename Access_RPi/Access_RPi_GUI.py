@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import sys, json
+import sys, json, numpy
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado import gen
 from tornado.websocket import websocket_connect
@@ -115,7 +115,7 @@ class Access(QtGui.QMainWindow):
 
             self.WORK_PERIOD = 2000 
             self.myTimer = QTimer()
-            self.myTimer.connect(self.processSQS)
+            self.myTimer.timeout.connect(self.processSQS)
             self.myTimer.start(self.WORK_PERIOD)
 
 
@@ -169,7 +169,6 @@ class Access(QtGui.QMainWindow):
             for msg in m:
                 body   = msg['Body']
                 acked_messages.append(msg['ReceiptHandle'])
-                
 
 
             # Now delete the ack'ed message
@@ -179,7 +178,7 @@ class Access(QtGui.QMainWindow):
         # otherwise just return
         else:
             return
-`
+
 
  
     def pubFingerprint(self, state, uname):
@@ -297,11 +296,16 @@ class Access(QtGui.QMainWindow):
         vbox.addWidget(self.state)
         vbox.addLayout(self.unamebox)
         vbox.addLayout(self.passwdbox)
-        
-        #fingerprint button
+      
+        # create fingerprint button  
+        self.fingerprint_btn = QtGui.QPushButton("Fingerprint", self)
+        self.fingerprint_btn.clicked.connect(self.verify)
+ 
+        #create fingerprint button layout
         fingerprintbox = QtGui.QVBoxLayout()
         fingerprintbox.addWidget(self.fingerprint_btn)
         fingerprintbox.addLayout(vbox)
+       
         # combine layouts
         fingerprintbox.addLayout(hbox)
 	wid.setLayout(fingerprintbox)
@@ -339,12 +343,9 @@ class Access(QtGui.QMainWindow):
         """
         Change the state of the Arm_status table in MySQL to 'disarmed' and set current user
         """
-        rand_ID = int(numpy.floor(numpy.random.uniform(0,5)))
+        rand_ID = int(numpy.floor(numpy.random.uniform(1,3)))
+	rand_ID = 1
         self.pubFingerprint(state="Success", uname=rand_ID)
-            self.WORK_PERIOD = 2000 
-            self.myTimer = QTimer()
-            self.myTimer.connect(self.processSQS)
-            self.myTimer.start(self.WORK_PERIOD)
         return
 
 
