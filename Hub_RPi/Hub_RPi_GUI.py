@@ -1,12 +1,14 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*
 
+import sys, json, numpy
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado import gen
 from tornado.websocket import websocket_connect
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import QTimer
-import sys
+from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
+from boto3.session import Session
 
 
 class Hub(QtGui.QMainWindow):
@@ -15,13 +17,14 @@ class Hub(QtGui.QMainWindow):
     Controls everything on the R Pi for this demo
     """
 
-    def __init__(self):
+    def __init__(self, use_websockets=False):
         """
         Setup the GUI, setup the Websockets Connection,
         provide timer and button callback updates, and display info
         """
 
         super(Hub,self).__init__()
+        self.use_websockets=use_websockets
 
 	# connection variables
         self.url = "ws://52.34.209.113:8080/websocket"
@@ -38,15 +41,125 @@ class Hub(QtGui.QMainWindow):
 	# initalize the GUI
         self.initUI()
 
-	# Connect to the Websockets server
-        self.connect()
-	
-	# setup the Websocket IO Loop
-	self.my_p_callback = PeriodicCallback(self.keep_alive, self.ws_timeout, io_loop=self.ioloop)
-	self.my_p_callback.start()
-        self.ioloop.start()
+        if self.use_websockets:
+	    # Connect to the Websockets server
+            self.connect()
+	    
+	    # setup the Websocket IO Loop
+	    self.my_p_callback = PeriodicCallback(self.keep_alive, self.ws_timeout, io_loop=self.ioloop)
+	    self.my_p_callback.start()
+            self.ioloop.start()
+
+        else:
+            self.rootCAPath="/home/pi/Desktop/root-CA.crt"
+            self.privateKeyPath="/home/pi/Desktop/Access01.private.key"
+            self.certificatePath="/home/pi/Desktop/Access01.cert.pem"
+            self.host="a1qhmcyp5eh8yq.iot.us-west-2.amazonaws.com"
+
+            self.setupAWS()
+  
+            self.WORK_PERIOD = 2000 
+            self.myTimer = QTimer()
+            self.myTimer.timeout.connect(self.processSQS)
+            self.myTimer.start(self.WORK_PERIOD)
+
+
+    def setupAWS(self):
+
+        # Setup AWS IoT basics
+        self.myAWSIoTMQTTClient = AWSIoTMQTTClient("basicPubSub")
+        self.myAWSIoTMQTTClient.configureEndpoint(self.host, 8883)
+        self.myAWSIoTMQTTClient.configureCredentials(self.rootCAPath, self.privateKeyPath, self.certificatePath)
+
+        # AWSIoTMQTTClient connection configuration
+        self.myAWSIoTMQTTClient.configureAutoReconnectBackoffTime(1, 32, 20)
+        self.myAWSIoTMQTTClient.configureOfflinePublishQueueing(-1)  # Infinite offline Publish queueing
+        self.myAWSIoTMQTTClient.configureDrainingFrequency(2)  # Draining: 2 Hz
+        self.myAWSIoTMQTTClient.configureConnectDisconnectTimeout(10)  # 10 sec
+        self.myAWSIoTMQTTClient.configureMQTTOperationTimeout(5)  # 5 sec
         
+        # Connect and subscribe to AWS IoT
+        self.myAWSIoTMQTTClient.connect()
+
+	# Connect to the SQS Queue
+        try:
+            self.session = Session()
+        except:
+            print("Need to configure AWS- exit and run 'aws configure' ")
+            sys.exit(-1)
         
+        self.client  = self.session.client('sqs')
+	self.queue   = self.client.get_queue_url(QueueName="Hub_Messages")['QueueUrl']
+
+
+
+    def processSQS(self):
+        """
+        Process messages from the queue
+        """
+
+        acked_messages = []
+        
+
+        # Pull Messages
+        self.messages = self.client.receive_message( 
+            QueueUrl = self.queue,
+            AttributeNames = ['ReceiptHandle','body'],
+            MaxNumberOfMessages = 10,
+            VisibilityTimeout = 60,
+            WaitTimeSeconds = 1	)
+
+        # Handle message
+        if self.messages.get('Messages'):
+            m = self.messages.get('Messages')
+            for msg in m:
+                body   = msg['Body']
+                acked_messages.append(msg['ReceiptHandle'])
+		print body
+
+            # Now delete the ack'ed message
+            for item in acked_messages:
+                self.client.delete_message(QueueUrl=self.queue, ReceiptHandle=item)
+
+        # otherwise just return
+        else:
+            return
+
+
+    def cbkLoggedInUser(self, client, userdata, message):
+        print("Received a new message: ")
+        try:
+            my_user = json.loads(message.payload)['message']
+        except:
+            print("INVALID MESSAGE: "+json.loads(message.payload))
+            return
+        print(my_user)
+        self.user_data.setText("Welcome, "+str(my_user))
+    
+    
+
+    def cbkArmState(self, client, userdata, message):
+        print("Received armState: ")
+        try:
+            arm_state = json.loads(message.payload)['armState']
+        except:
+            print("ERROR")
+            return
+        print(arm_state)
+        self.state.setText("Arm state is: "+str(arm_state))
+        if arm_state == "Armed":
+            self.is_armed = True
+            self.Arm_btn.hide()
+            self.Disarm_btn.hide()
+        elif arm_state == "Disarmed":
+            self.is_armed = False
+            self.Arm_btn.show()
+            self.Disarm_btn.show()
+        else:
+            print "Error: INVALID STATE. Need 'Armed' or 'Disarmed' "
+            return
+
+ 
     def initUI(self):
         """ 
         Initialize + configure all QT modules used in the GUI
@@ -62,12 +175,12 @@ class Hub(QtGui.QMainWindow):
 	# Create user-name label
         self.user_data=QtGui.QLabel(self)
         self.user_data.setFont(font)
-        self.user_data.setText("Name")
+        self.user_data.setText("No Logged In User")
 
 	# Create alarm-state label
         self.state=QtGui.QLabel(self)
         self.state.setFont(font)
-        self.state.setText("State")
+        self.state.setText("Arm state is: Armed")
 	self.state.setStyleSheet("color: blue")
 
 	# Create status bar
@@ -75,22 +188,23 @@ class Hub(QtGui.QMainWindow):
 	self.statusBar().setStyleSheet("color: red; font-size:18pt")
 
 	# Create Arm button        
-	Arm_btn=QtGui.QPushButton("Arm",self)
-        Arm_btn.clicked.connect(self.sendArm)
-	
+	self.Arm_btn=QtGui.QPushButton("LEDs On",self)
+        self.Arm_btn.clicked.connect(self.sendLEDsOn)
+        self.Arm_btn.hide()
+
 	# Create Disarm button        
-	Disarm_btn=QtGui.QPushButton("Disarm",self)
-        Disarm_btn.clicked.connect(self.sendDisarm)
+	self.Disarm_btn=QtGui.QPushButton("LEDs Off",self)
+        self.Disarm_btn.clicked.connect(self.sendLEDsOff)
+        self.Disarm_btn.hide()
 
 	# Now create layout
-
         wid = QtGui.QWidget(self)
         self.setCentralWidget(wid)
 
 	# put buttons in an hbox
 	hbox = QtGui.QHBoxLayout()
-        hbox.addWidget(Arm_btn)
-        hbox.addWidget(Disarm_btn)
+        hbox.addWidget(self.Arm_btn)
+        hbox.addWidget(self.Disarm_btn)
         
 	# put buttons + status in a vbox
 	vbox = QtGui.QVBoxLayout()
@@ -107,25 +221,30 @@ class Hub(QtGui.QMainWindow):
 
 
         
-    def sendArm(self):
+    def sendLEDsOn(self):
         """
         Change the state of the Arm_status table in MySQL to 'armed'
         """
 
+        print("TODO SET LEDS ON")
+        self.state.setText('Would have set LEDs ON')
         if self.ws is None:
-            self.connect()
+            pass
         else:
             print("ARM SYSTEM")        
-            self.ws.write_message("set_arm")
+            #self.ws.write_message("set_arm")
 
 
-    def sendDisarm(self):
+    def sendLEDsOff(self):
         """
         Change the state of the Arm_status table in MySQL to 'disarmed'
         """
 
+        self.state.setText('Would have set LEDs OFF')
+        print("TODO SET LEDS OFF")
         if self.ws is None:
-            self.connect()
+            #self.connect()
+            pass
         else:
             print("DISARM SYSTEM")        
             self.ws.write_message("set_dis")
