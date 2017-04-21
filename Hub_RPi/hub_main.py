@@ -11,6 +11,56 @@ from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from boto3.session import Session
 
 
+from helpers import WindowState
+from lockedwindow import LockedWindow
+from ledwindow import LEDWindow
+
+
+#class LockedWindow(QtGui.QMainWindow):
+#    """
+#    This is the window that should be shown when the device is locked
+#    """
+#
+#    def __init__(self, parent=None):
+#        """
+#        initialize this window
+#        """
+#	super(LockedWindow, self).__init__(parent)
+#        self.initUI()
+#
+#
+#
+#    def initUI(self):
+#
+#	# create QT font
+#        self.font = QtGui.QFont()
+#        self.font.setFamily(QtCore.QString.fromUtf8("Helvetica"))
+#        self.font.setBold(True)
+#        self.font.setPointSize(20)
+#
+#	# Create user-name label
+#        self.armed=QtGui.QLabel(self)
+#        self.armed.setFont(self.font)
+#        self.armed.setText("System is ARMED")
+#	self.armed.setStyleSheet("color: red")
+#        
+#
+#        # put buttons + status in a vbox
+#        wid = QtGui.QWidget(self)
+#	vbox = QtGui.QVBoxLayout()
+#        vbox.addWidget(self.armed)
+#	wid.setLayout(vbox)
+#        self.setCentralWidget(wid)
+#
+#        # set to armed
+#        self.setGeometry(50,50,600,400)
+#        self.setWindowTitle('System is Armed')
+#
+#
+#    def teardown(self):
+#        self.close()
+
+
 class Hub(QtGui.QMainWindow):
     """
     The top-level class of the project2 Hub R Pi GUI-
@@ -25,6 +75,11 @@ class Hub(QtGui.QMainWindow):
 
         super(Hub,self).__init__()
         self.use_websockets=use_websockets
+
+        # set access ctl
+	self.access   = 0
+        self.my_state = None
+
 
 	# connection variables
         self.url = "ws://52.34.209.113:8080/websocket"
@@ -63,6 +118,7 @@ class Hub(QtGui.QMainWindow):
             self.myTimer.timeout.connect(self.processSQS)
             self.myTimer.start(self.WORK_PERIOD)
 
+        self.set_locked()
 
     def setupAWS(self):
 
@@ -92,6 +148,12 @@ class Hub(QtGui.QMainWindow):
 	self.queue   = self.client.get_queue_url(QueueName="Hub_Messages")['QueueUrl']
 
 
+    def set_locked(self):
+        self.lockscreen = LockedWindow(self)
+        self.lockscreen.show()
+        self.hide()
+        self.my_state = WindowState.LOCK_WINDOW
+
 
     def processSQS(self):
         """
@@ -116,6 +178,25 @@ class Hub(QtGui.QMainWindow):
                 body   = msg['Body']
                 acked_messages.append(msg['ReceiptHandle'])
 		print body
+                json_body = json.loads(body)
+                
+                arm_state = json_body['arm_state']
+                my_user   = json_body['username']
+                access    = json_body['access']       
+    
+                self.access = int(access)
+
+                if arm_state == "Armed":
+                    if self.lockscreen == None:
+                        self.set_locked()
+
+                else:
+		    self.user_data.setText("Welcome, "+str(my_user))
+
+                    if self.lockscreen != None:
+                        self.lockscreen.teardown()
+                        self.lockscreen = None
+                        self.show()
 
             # Now delete the ack'ed message
             for item in acked_messages:
@@ -126,39 +207,6 @@ class Hub(QtGui.QMainWindow):
             return
 
 
-    def cbkLoggedInUser(self, client, userdata, message):
-        print("Received a new message: ")
-        try:
-            my_user = json.loads(message.payload)['message']
-        except:
-            print("INVALID MESSAGE: "+json.loads(message.payload))
-            return
-        print(my_user)
-        self.user_data.setText("Welcome, "+str(my_user))
-    
-    
-
-    def cbkArmState(self, client, userdata, message):
-        print("Received armState: ")
-        try:
-            arm_state = json.loads(message.payload)['armState']
-        except:
-            print("ERROR")
-            return
-        print(arm_state)
-        self.state.setText("Arm state is: "+str(arm_state))
-        if arm_state == "Armed":
-            self.is_armed = True
-            self.Arm_btn.hide()
-            self.Disarm_btn.hide()
-        elif arm_state == "Disarmed":
-            self.is_armed = False
-            self.Arm_btn.show()
-            self.Disarm_btn.show()
-        else:
-            print "Error: INVALID STATE. Need 'Armed' or 'Disarmed' "
-            return
-
  
     def initUI(self):
         """ 
@@ -168,7 +216,7 @@ class Hub(QtGui.QMainWindow):
 	
 	# create QT font
         font = QtGui.QFont()
-        font.setFamily(QtCore.QString.fromUtf8("FreeMono"))
+        font.setFamily(QtCore.QString.fromUtf8("Helvetica"))
         font.setBold(True)
         font.setPointSize(20)
 
