@@ -56,15 +56,10 @@ class Enrolling(QtGui.QMainWindow):
         	else:
 			
         		self.statusBar().showMessage("Registration Successful")
-                        Access.pubaddFingerprint(access,self.Enteredname.text(),self.Enroll_result)
+                        access.pubaddFingerprint(self.Enteredname.text(),self.Enroll_result)
+                
 	def Delete(self):
-		my_Delete = Deleting()
-		self.Delete_result = my_Delete.runscript()
-		if self.Delete_result is None:
-			self.statusBar().showMessage("Deletion failed")
-		else:
-			self.statusBar().showMessage("Deleted successfully")
-			Access.pubrmFingerprint(access,self.Enteredname.text())
+                access.pubrmFingerprint(self.Enteredname.text())
 	
 class Access(QtGui.QMainWindow):
     """
@@ -172,17 +167,27 @@ class Access(QtGui.QMainWindow):
                 body   = msg['Body']
                 acked_messages.append(msg['ReceiptHandle'])
                 json_body = json.loads(body)
+                print(json_body)
+                if json_body['type'] == 'rm_index':
+                        user_id = json_body['user_id']
+                        my_Delete = Deleting()
+                        self.Delete_result = my_Delete.runscript(user_id)
+                        if self.Delete_result is None:
+                                self.statusBar().showMessage("Deletion failed")
+                        else:
+                                self.statusBar().showMessage("Deleted successfully")
 
-                arm_state = json_body['arm_state']
-                user = json_body['username']
-                access_lvl = json_body['access']
-       
-                if arm_state == "Armed": 
-                    self.state.setText("System is ARMED")
-                    self.user_data.setText("")
-                else:
-                    self.state.setText("")
-                    self.user_data.setText("Welcome, %s!" % user)
+                elif json_body['type'] == 'login':
+                        
+                        arm_state = json_body['arm_state']
+                        user = json_body['username']
+                        access_lvl = json_body['access']
+                        if arm_state == "Armed": 
+                            self.state.setText("System is ARMED")
+                            self.user_data.setText("")
+                        else:
+                            self.state.setText("")
+                            self.user_data.setText("Welcome, %s!" % user)
 
             # Now delete the ack'ed message
             for item in acked_messages:
@@ -250,8 +255,6 @@ class Access(QtGui.QMainWindow):
         usrData = {}
         if name == None:
                 name="None"
-        if user_id == None:
-                user_id="None"
         usrData['name']=str(name) 
         #usrData['user_id']  =str(user_id) 
         jsonData = json.dumps(usrData)

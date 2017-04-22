@@ -14,7 +14,7 @@ class Deleting:
 
         while True:
             print 'Deleting all previous id'
-            response = f.DeleteId(self,ID)
+            response = f.DeleteId(ID)
             if response[0]['ACK']:
                 break
             else:
