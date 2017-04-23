@@ -7,8 +7,7 @@ from PyQt4.QtCore import QTimer
 from helpers import WindowState
 
 
-
-class LEDWindow(QtGui.QMainWindow):
+class StatsWindow(QtGui.QMainWindow):
     """
     This is the window that should be shown when the device is locked
     """
@@ -17,9 +16,10 @@ class LEDWindow(QtGui.QMainWindow):
         """
         initialize this window
         """
-	super(LEDWindow, self).__init__(parent)
+	super(StatsWindow, self).__init__(parent)
         self.initUI()
         self.parent = parent
+
 
 
     def initUI(self):
@@ -31,44 +31,34 @@ class LEDWindow(QtGui.QMainWindow):
         self.font.setPointSize(20)
 
 	# Create user-name label
-        self.armed=QtGui.QLabel(self)
-        self.armed.setFont(self.font)
-        self.armed.setText("LED Controls")
-	self.armed.setStyleSheet("color: blue")
+        self.stats=QtGui.QLabel(self)
+        self.stats.setFont(self.font)
+        self.stats.setText("System Stats")
         
         # put buttons + status in a vbox
-        self.LEDon=QtGui.QPushButton("LEDs On",self)
-        self.LEDon.clicked.connect(self.LEDsOn)
-
-        self.LEDoff=QtGui.QPushButton("LEDs Off",self)
-        self.LEDoff.clicked.connect(self.LEDsOff)
+        self.todo=QtGui.QPushButton("TODO",self)
+        self.todo.clicked.connect(self.printStats)
         
         # put buttons + status in a vbox
         self.goback=QtGui.QPushButton("Back",self)
         self.goback.clicked.connect(self.goBack)
-        
+
         wid = QtGui.QWidget(self)
 	vbox = QtGui.QVBoxLayout()
-        vbox.addWidget(self.armed)
-        vbox.addWidget(self.LEDon)
-        vbox.addWidget(self.LEDoff)
+        vbox.addWidget(self.stats)
+        vbox.addWidget(self.todo)
         vbox.addWidget(self.goback)
 	wid.setLayout(vbox)
         self.setCentralWidget(wid)
 
         # set to armed
         self.setGeometry(50,50,600,400)
-        self.setWindowTitle('System LED control')
+        self.setWindowTitle('System Stats')
 
 
 
-    def LEDsOn(self):
-        self.armed.setText("TODO Set LEDs ON")
-
-
-
-    def LEDsOff(self):
-        self.armed.setText("TODO Set LEDs OFF")
+    def printStats(self):
+        self.stats.setText("Would have printed stats!")
 
 
 
