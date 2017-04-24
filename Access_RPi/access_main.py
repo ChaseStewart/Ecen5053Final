@@ -10,57 +10,14 @@ from PyQt4.QtCore import QTimer
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from boto3.session import Session
 
-#import fingerpi as fpi
+
+from helpers import AccessState
+from enrollwindow import EnrollWindow
 from Verify import verifier
 from Enroll import enrolling
 from Delete import Deleting
 
-class Enrolling(QtGui.QMainWindow):
-	def __init__(self,parent=None):
-                self.Enroll_result= None
-                self.Delete_result=None
-        	super(Enrolling,self).__init__(parent)
 
-                self.addUser_btn=QtGui.QPushButton("Add User",self)
-                self.addUser_btn.clicked.connect(self.Enroll)
-
-                self.deleteUser_btn=QtGui.QPushButton("Delete User",self)
-                self.deleteUser_btn.clicked.connect(self.Delete)
-
-                self.name_lbl=QtGui.QLabel(self)
-                self.name_lbl.setText("Name")
-
-                self.Enteredname=QtGui.QLineEdit(self)
-                self.Enteredname.setPlaceholderText("Enter user name")
-
-                self.buttonbox=QtGui.QVBoxLayout()
-                self.buttonbox.addWidget(self.addUser_btn)
-                self.buttonbox.addWidget(self.deleteUser_btn)
-                self.hBox=QtGui.QHBoxLayout()
-                self.Labelbox = QtGui.QHBoxLayout()
-                self.Labelbox.addWidget(self.name_lbl)
-                self.Labelbox.addWidget(self.Enteredname)
-                self.hBox.addLayout(self.Labelbox)
-                self.hBox.addLayout(self.buttonbox)
-                wid = QtGui.QWidget(self)
-                self.setCentralWidget(wid)
-                wid.setLayout(self.hBox)
-                self.setGeometry(50,50,600,400)
-                self.show()
-
-	def Enroll(self):
-        	my_Enroll = enrolling()
-                self.Enroll_result = my_Enroll.runscript()
-        	if self.Enroll_result is None:
-        		self.statusBar().showMessage("Registration Unsuccessful")	
-        	else:
-			
-        		self.statusBar().showMessage("Registration Successful")
-                        access.pubaddFingerprint(self.Enteredname.text(),self.Enroll_result)
-                
-	def Delete(self):
-                access.pubrmFingerprint(self.Enteredname.text())
-	
 class Access(QtGui.QMainWindow):
     """
     The top-level class of the project2 Hub R Pi GUI-
@@ -84,6 +41,13 @@ class Access(QtGui.QMainWindow):
         self.drop_count = 0
         self.toggle = 0
 
+        # access_state_vars
+        self.startWithEnroll = True
+        self.enrollWindow = None
+        self.window_state = None 
+        self.access = 0
+
+
 	# Tornado Variables
         self.ws_ioloop = IOLoop.instance()
         self.ws = None
@@ -93,6 +57,10 @@ class Access(QtGui.QMainWindow):
 
 	# initalize the GUI
         self.initUI()
+
+        # initialize the main window
+        self.window_state = AccessState.ARM_WINDOW
+        self.set_window_to_state()
 
 	
         if self.use_websockets: 
@@ -185,9 +153,14 @@ class Access(QtGui.QMainWindow):
                         if arm_state == "Armed": 
                             self.state.setText("System is ARMED")
                             self.user_data.setText("")
+                            self.window_state = AccessState.ARM_WINDOW
+                            self.set_window_to_state()
+
                         else:
                             self.state.setText("")
                             self.user_data.setText("Welcome, %s!" % user)
+                            self.window_state = AccessState.DISARM_WINDOW
+                            self.set_window_to_state()
 
             # Now delete the ack'ed message
             for item in acked_messages:
@@ -248,6 +221,8 @@ class Access(QtGui.QMainWindow):
         print("PUB to addFINGERPRINT\n\t username:%s, user_id:%s" % (name,user_id))
         self.myAWSIoTMQTTClient.publish("AccessControl/addFingerprint", str(jsonData), 1)
 
+
+
     def pubrmFingerprint(self, name):
         """
         Publish new Fingerprint added to AWS       
@@ -260,6 +235,7 @@ class Access(QtGui.QMainWindow):
         jsonData = json.dumps(usrData)
         print("PUB FINGERPRINT\n\t username:%s" % (name))
         self.myAWSIoTMQTTClient.publish("AccessControl/rmFingerprint", str(jsonData), 1)
+
 
 
     def initUI(self):
@@ -353,8 +329,32 @@ class Access(QtGui.QMainWindow):
         wid.setLayout(hbox)
         self.setGeometry(50,50,600,400)
         self.setWindowTitle('Project 2 Demo')
-        self.show()
     
+
+
+    def set_window_to_state(self):
+
+        print ("Arm state is %d" % self.window_state)
+
+        if self.window_state != AccessState.ARM_WINDOW:
+            print("Hiding arm window")
+            self.hide()
+
+        if self.window_state != AccessState.DISARM_WINDOW and self.enrollWindow != None:
+            print("Hiding disarm window")
+            self.enrollWindow.teardown()
+            self.enrollWindow = None
+
+        if self.window_state == AccessState.ARM_WINDOW:
+            print("Showing arm window")
+            self.show()
+
+        elif self.window_state == AccessState.DISARM_WINDOW:
+            print("Showing disarm window")
+            self.enrollWindow = EnrollWindow(self)
+            self.enrollWindow.show()
+
+
     def verify(self):
         my_verify = verifier()
         print("Verification")
@@ -367,7 +367,7 @@ class Access(QtGui.QMainWindow):
     		#self.pubAccessState("Disarmed")
                 self.pubFingerprint(state="Success", uname=self.verify_result)
 		self.hide()
-        	self.newWindow= Enrolling(self)
+        	self.newWindow= EnrollWindow(self)
                 
 
 
@@ -378,8 +378,6 @@ class Access(QtGui.QMainWindow):
         uname =self.input1.text()
         passwd=self.input2.text()
         self.pubUserPass(uname, passwd)
-        self.hide()
-        self.newWindow= Enrolling(self)
         return
 
 
