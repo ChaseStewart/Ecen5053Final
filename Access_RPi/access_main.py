@@ -14,9 +14,9 @@ from boto3.session import Session
 from helpers import AccessState
 from enrollwindow import EnrollWindow
 from Verify import verifier
-from Enroll import enrolling
+#from Enroll import enrolling
 from Delete import Deleting
-
+from customwindow import CustomMessageBox
 
 class Access(QtGui.QMainWindow):
     """
@@ -44,6 +44,7 @@ class Access(QtGui.QMainWindow):
         # access_state_vars
         self.startWithEnroll = True
         self.enrollWindow = None
+        self.customWindow = None
         self.window_state = None 
         self.access = 0
 
@@ -138,12 +139,15 @@ class Access(QtGui.QMainWindow):
                 print(json_body)
                 if json_body['type'] == 'rm_index':
                         user_id = json_body['user_id']
-                        my_Delete = Deleting()
-                        self.Delete_result = my_Delete.runscript(user_id)
-                        if self.Delete_result is None:
-                                self.statusBar().showMessage("Deletion failed")
-                        else:
-                                self.statusBar().showMessage("Deleted successfully")
+                        try:
+                            my_Delete = Deleting()
+                            self.Delete_result = my_Delete.runscript(user_id)
+                            if self.Delete_result is None:
+                                    self.statusBar().showMessage("Deletion failed")
+                            else:
+                                    self.statusBar().showMessage("Deleted successfully")
+                        except:
+                            print("Error- message could not be handled!")
 
                 elif json_body['type'] == 'login':
                         
