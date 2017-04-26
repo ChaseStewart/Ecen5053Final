@@ -9,7 +9,6 @@ from boto3.session import Session
 
 import fingerpi as fp
 from Verify import verifier
-#from Enroll import enrolling
 from Delete import Deleting
 from helpers import AccessState
 from customwindow import CustomMessageBox
@@ -114,23 +113,26 @@ class EnrollWindow(QtGui.QMainWindow):
 
 
     def runscript(self):
-    
+        """
+        Enroll the finger print
+        """
         f = fp.FingerPi()
-        i=1
+        ID=1 # id for the fingerprint
         f.Open(extra_info = True, check_baudrate = True)    
         f.ChangeBaudrate(115200)
         f.CmosLed(True)
-        response = f.GetEnrollCount()
+        response = f.GetEnrollCount() # get number of enrolled fingerprints
         if response[0]['ACK']:
-            i=response[0]['Parameter']
-            i=i+1
-            print  i
+            ID=response[0]['Parameter']
+            ID=ID+1
+            print  ID
         self.instructions.setText("Place finger on scanner")
         self.instructions.repaint()
         time.sleep(1)
-        
+
+        # Enroll start sends the ID for the finger print to be scanned
         while True:
-            response = f.EnrollStart(i)
+            response = f.EnrollStart(ID)
             if response[0]['ACK']:
                 self.instructions.setText("Wait...")
                 self.instructions.repaint()
@@ -138,12 +140,12 @@ class EnrollWindow(QtGui.QMainWindow):
                 break
             else:
                 print 'error',response[0]['Parameter']
-                time.sleep(0.3)
 
         self.instructions.setText("Remove finger from scanner")
         self.instructions.repaint()
         time.sleep(1)
 
+        #before enrolling check whether finger is pressed
         while True:
             response = f.IsPressFinger()
             if response[0]['ACK']:
@@ -151,15 +153,15 @@ class EnrollWindow(QtGui.QMainWindow):
                     time.sleep(0.3)
 		    break    
 
+        #scan the fingerprint
         while True:
-            #print 'captureFinger'
             response = f.CaptureFinger()
             if response[0]['ACK']:
 		break
             else:
 		print 'error',response[0]['Parameter']
 
-        
+        #saving the scanned image for the first time
         while True:
             response = f.Enroll1()
             if response[0]['ACK']:
@@ -172,13 +174,13 @@ class EnrollWindow(QtGui.QMainWindow):
         self.instructions.repaint()
         time.sleep(1)
 
+        #before scanning for 2nd time check whether finger is removed
         while True:
             response = f.IsPressFinger()
             if response[0]['ACK']:
 		if response[0]['Parameter']==0:
                     time.sleep(1)
 		else:
-		    #time.sleep(1)
 		    break
 		
         self.instructions.setText("Remove finger on scanner again")
@@ -187,12 +189,12 @@ class EnrollWindow(QtGui.QMainWindow):
 
         # now placing finger on scanner 2nd time        
         while True:
-            #print 'IspressFinger'
             response = f.IsPressFinger()
             if response[0]['ACK']:
 		if response[0]['Parameter']==0:
-		    #time.sleep(3)
 		    break
+
+        #scan the finger for 2nd time
         while True:
             response = f.CaptureFinger()
             if response[0]['ACK']:
@@ -200,8 +202,8 @@ class EnrollWindow(QtGui.QMainWindow):
             else:
 		print 'error',response[0]['Parameter']
 
+        #saving the scanned image 2nd time
         while True:
-            #print 'Enrollment 2'
             response = f.Enroll2()
             if response[0]['ACK']:
                 break
@@ -212,27 +214,27 @@ class EnrollWindow(QtGui.QMainWindow):
         self.instructions.setText("Place finger from scanner final time")
         self.instructions.repaint()
 
+        #check if finger is removed from the scanner
         while True:
-            #print 'IspressFinger'
             response = f.IsPressFinger()
             if response[0]['Parameter']==0:
 		time.sleep(1)
             else:
-		time.sleep(1)
 		break
 	    
         self.instructions.setText("Remove finger on scanner final time")
         self.instructions.repaint()
         time.sleep(1)
-        
+
+
+        #check if finger is pressed for the 3rd time
         while True:
-            #print 'IspressFinger'
             response = f.IsPressFinger()
             if response[0]['ACK']:
 		if response[0]['Parameter']==0:
-		    #time.sleep(3)
 		    break
 
+        #scan the finger 
         while True:
             response = f.CaptureFinger()
             if response[0]['ACK']:
@@ -246,8 +248,9 @@ class EnrollWindow(QtGui.QMainWindow):
         self.instructions.repaint()
         time.sleep(1)
 
+
+        #save the image and combine them with other images 
         while True:
-            print 'Enrollment 3'
             response = f.Enroll3()
             if response[0]['ACK']:
 		break
@@ -259,5 +262,5 @@ class EnrollWindow(QtGui.QMainWindow):
         f.CmosLed(False)   
         print 'Closing connection...'
         f.Close()
-        return i
+        return ID
 

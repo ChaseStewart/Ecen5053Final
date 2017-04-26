@@ -5,6 +5,7 @@ import time
 
 
 class Deleting:
+    
     def __init__(self):
         pass
     def runscript(self,ID):
@@ -13,7 +14,7 @@ class Deleting:
         f.Open(extra_info = True, check_baudrate = True)
 
         while True:
-            print 'Deleting all previous id'
+            print 'Deleting ID'
             response = f.DeleteId(ID)
             if response[0]['ACK']:
                 break

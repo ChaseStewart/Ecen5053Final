@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import sys, json, numpy
+import sys, json, numpy, time
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado import gen
 from tornado.websocket import websocket_connect
@@ -11,10 +11,10 @@ from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from boto3.session import Session
 
 
+
 from helpers import AccessState
 from enrollwindow import EnrollWindow
 from Verify import verifier
-#from Enroll import enrolling
 from Delete import Deleting
 from customwindow import CustomMessageBox
 
@@ -144,8 +144,12 @@ class Access(QtGui.QMainWindow):
                             self.Delete_result = my_Delete.runscript(user_id)
                             if self.Delete_result is None:
                                     self.statusBar().showMessage("Deletion failed")
+                                    time.sleep(1)
+                                    self.statusBar().clearMessage()
                             else:
                                     self.statusBar().showMessage("Deleted successfully")
+                                    time.sleep(1)
+                                    self.statusBar().clearMessage()
                         except:
                             print("Error- message could not be handled!")
 
@@ -163,6 +167,8 @@ class Access(QtGui.QMainWindow):
                         else:
                             self.state.setText("")
                             self.user_data.setText("Welcome, %s!" % user)
+                            #trail
+                            #self.enrollWindow.instructions.setText("Welcome, %s!" % user)
                             self.window_state = AccessState.DISARM_WINDOW
                             self.set_window_to_state()
 
@@ -187,6 +193,7 @@ class Access(QtGui.QMainWindow):
         armData['state']=str(state) 
         armData['user_id']  =str(uname) 
         jsonData = json.dumps(armData)
+
         print("PUB FINGERPRINT\n\tSending state:%s, user_id:%s" % (state, uname))
         self.myAWSIoTMQTTClient.publish("AccessControl/Fingerprint", str(jsonData), 1)
 
@@ -222,6 +229,7 @@ class Access(QtGui.QMainWindow):
         usrData['name']=str(name) 
         usrData['user_id']  =str(user_id) 
         jsonData = json.dumps(usrData)
+
         print("PUB to addFINGERPRINT\n\t username:%s, user_id:%s" % (name,user_id))
         self.myAWSIoTMQTTClient.publish("AccessControl/addFingerprint", str(jsonData), 1)
 
@@ -237,6 +245,7 @@ class Access(QtGui.QMainWindow):
         usrData['name']=str(name) 
         #usrData['user_id']  =str(user_id) 
         jsonData = json.dumps(usrData)
+
         print("PUB FINGERPRINT\n\t username:%s" % (name))
         self.myAWSIoTMQTTClient.publish("AccessControl/rmFingerprint", str(jsonData), 1)
 
@@ -366,7 +375,9 @@ class Access(QtGui.QMainWindow):
         self.verify_result = my_verify.runscript()
         if self.verify_result is None:
     		#self.pubAccessState("Armed")
-        	self.statusBar().showMessage("Access Denied")	
+        	self.statusBar().showMessage("Access Denied")
+        	time.sleep(1)
+        	self.statusBar().clearMessage()
         else:
     		#self.pubAccessState("Disarmed")
                 self.pubFingerprint(state="Success", uname=self.verify_result)
