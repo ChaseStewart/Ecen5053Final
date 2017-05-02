@@ -25,6 +25,7 @@
 			<!--to connect to the databse and get data to display in the table -->
 			<?php
                                 /* details to connect to database*/
+<<<<<<< HEAD
 				$host = "embintdes.cyjeijyfmmbt.us-west-2.rds.amazonaws.com:3306";
 				$user = "cstewart";
 				$db_name= "users_data";
@@ -32,6 +33,13 @@
 
                                 /* connect to sql**/
 				$con = mysql_connect($host, $user, $passwd);
+=======
+				$host = "localhost";
+				$user = "root";
+				$db_name= "users_data";
+                                /* connect to sql**/
+				$con = mysql_connect($host, $user);
+>>>>>>> master
 				if (!$con) 
 				{ 
 					die('Could not connect: ' . mysql_error()); 

@@ -10,6 +10,13 @@ from PyQt4.QtCore import QTimer
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from boto3.session import Session
 
+# all windows
+from helpers import WindowState
+from lockedwindow import LockedWindow
+from ledwindow import LEDWindow
+from statswindow import StatsWindow
+from hub_voice import Hub_voice
+
 
 class Hub(QtGui.QMainWindow):
     """
@@ -26,13 +33,24 @@ class Hub(QtGui.QMainWindow):
         super(Hub,self).__init__()
         self.use_websockets=use_websockets
 
+        # set access ctl
+	self.access   = 0
+        self.window_state = None
+        self.logged_in_user = ""
+        self.start_armed = True
+
+        # set windows
+        self.lockscreen  = None
+        self.ledscreen   = None
+        self.statsscreen = None
+
 	# connection variables
         self.url = "ws://52.34.209.113:8080/websocket"
         self.ws_timeout  = 500
         self.gui_timeout = 250 
-        self.first_time=True
-        self.drop_count = 0
-        self.toggle = 0
+        self.first_time  = True
+        self.drop_count  = 0
+        self.toggle      = 0
 
 	# Tornado Variables
         self.ioloop = IOLoop.instance()
@@ -55,7 +73,6 @@ class Hub(QtGui.QMainWindow):
             self.privateKeyPath="/home/pi/Desktop/Access01.private.key"
             self.certificatePath="/home/pi/Desktop/Access01.cert.pem"
             self.host="a1qhmcyp5eh8yq.iot.us-west-2.amazonaws.com"
-
             self.setupAWS()
   
             self.WORK_PERIOD = 2000 
@@ -63,6 +80,8 @@ class Hub(QtGui.QMainWindow):
             self.myTimer.timeout.connect(self.processSQS)
             self.myTimer.start(self.WORK_PERIOD)
 
+        self.window_state = WindowState.LOCK_WINDOW
+        self.set_window_to_state()
 
     def setupAWS(self):
 
@@ -92,12 +111,60 @@ class Hub(QtGui.QMainWindow):
 	self.queue   = self.client.get_queue_url(QueueName="Hub_Messages")['QueueUrl']
 
 
+    def set_window_to_state(self):
+        """
+        Select a window to display using enums from Helpers
+        """
+
+        print("Changing state to %d" % self.window_state)
+
+        if self.lockscreen != None and self.window_state != WindowState.LOCK_WINDOW:
+            print("Hiding Lockscreen")
+            self.lockscreen.teardown()
+            self.lockscreen = None
+
+        if self.window_state != WindowState.MAIN_WINDOW:
+            if self.start_armed:
+                self.start_armed = False
+            else:
+                print("Hiding Main")
+                self.hide()
+
+        if self.ledscreen != None and self.window_state != WindowState.LED_WINDOW:
+            print("Hiding LEDscreen")
+            self.ledscreen.teardown()
+            self.ledscreen = None
+
+        if self.statsscreen != None and self.window_state != WindowState.STATS_WINDOW:
+            print("Hiding Statsscreen")
+            self.statsscreen.teardown()
+            self.statsscreen = None
+
+        if self.window_state == WindowState.LOCK_WINDOW and self.lockscreen == None:
+            print("Showing Lockscreen")
+            self.lockscreen = LockedWindow(self)
+            self.lockscreen.show()
+
+        if self.window_state == WindowState.MAIN_WINDOW:
+            print("Showing Main")
+            self.show()
+
+        if self.window_state == WindowState.LED_WINDOW and self.ledscreen == None:
+            print("Showing LEDscreen")
+            self.ledscreen = LEDWindow(self)
+            self.ledscreen.show()
+
+        if self.window_state == WindowState.STATS_WINDOW and self.statsscreen == None:
+            print("Showing Statscreen")
+            self.statsscreen = StatsWindow(self)
+            self.statsscreen.show()
+
+
 
     def processSQS(self):
         """
         Process messages from the queue
         """
-
         acked_messages = []
         
 
@@ -116,48 +183,32 @@ class Hub(QtGui.QMainWindow):
                 body   = msg['Body']
                 acked_messages.append(msg['ReceiptHandle'])
 		print body
+                json_body = json.loads(body)
+                
+                arm_state = json_body['arm_state']
+                my_user   = json_body['username']
+                access    = json_body['access']       
+
+                self.logged_in_user = my_user    
+                self.access = int(access)
+
+                if arm_state == "Armed":
+                    self.window_state = WindowState.LOCK_WINDOW
+                    self.set_window_to_state()
+
+                else:
+		    self.user_data.setText("Welcome, "+str(self.logged_in_user))
+                    self.window_state = WindowState.MAIN_WINDOW 
+                    self.set_window_to_state()
 
             # Now delete the ack'ed message
             for item in acked_messages:
                 self.client.delete_message(QueueUrl=self.queue, ReceiptHandle=item)
-
+            return self.logged_in_user
         # otherwise just return
         else:
             return
 
-
-    def cbkLoggedInUser(self, client, userdata, message):
-        print("Received a new message: ")
-        try:
-            my_user = json.loads(message.payload)['message']
-        except:
-            print("INVALID MESSAGE: "+json.loads(message.payload))
-            return
-        print(my_user)
-        self.user_data.setText("Welcome, "+str(my_user))
-    
-    
-
-    def cbkArmState(self, client, userdata, message):
-        print("Received armState: ")
-        try:
-            arm_state = json.loads(message.payload)['armState']
-        except:
-            print("ERROR")
-            return
-        print(arm_state)
-        self.state.setText("Arm state is: "+str(arm_state))
-        if arm_state == "Armed":
-            self.is_armed = True
-            self.Arm_btn.hide()
-            self.Disarm_btn.hide()
-        elif arm_state == "Disarmed":
-            self.is_armed = False
-            self.Arm_btn.show()
-            self.Disarm_btn.show()
-        else:
-            print "Error: INVALID STATE. Need 'Armed' or 'Disarmed' "
-            return
 
  
     def initUI(self):
@@ -168,7 +219,7 @@ class Hub(QtGui.QMainWindow):
 	
 	# create QT font
         font = QtGui.QFont()
-        font.setFamily(QtCore.QString.fromUtf8("FreeMono"))
+        font.setFamily(QtCore.QString.fromUtf8("Helvetica"))
         font.setBold(True)
         font.setPointSize(20)
 
@@ -177,79 +228,92 @@ class Hub(QtGui.QMainWindow):
         self.user_data.setFont(font)
         self.user_data.setText("No Logged In User")
 
-	# Create alarm-state label
-        self.state=QtGui.QLabel(self)
-        self.state.setFont(font)
-        self.state.setText("Arm state is: Armed")
-	self.state.setStyleSheet("color: blue")
+        # Create voice_status label
+        self.voice_status=QtGui.QLabel(self)
+        self.voice_status.setFont(font)
+        self.voice_status.setText("Voice Mode off")
 
 	# Create status bar
 	self.statusBar()
 	self.statusBar().setStyleSheet("color: red; font-size:18pt")
 
-	# Create Arm button        
-	self.Arm_btn=QtGui.QPushButton("LEDs On",self)
-        self.Arm_btn.clicked.connect(self.sendLEDsOn)
-        self.Arm_btn.hide()
+	# Create LED button
+	self.LED_btn=QtGui.QPushButton("LED Settings",self)
+        self.LED_btn.clicked.connect(self.setLEDPage)
 
-	# Create Disarm button        
-	self.Disarm_btn=QtGui.QPushButton("LEDs Off",self)
-        self.Disarm_btn.clicked.connect(self.sendLEDsOff)
-        self.Disarm_btn.hide()
+        # Create Voice mode button
+	self.Voice_btn=QtGui.QPushButton("Voice Mode",self)
+        self.Voice_btn.clicked.connect(self.setVoicemode)
+        
+
+	# Create Stats button        
+	self.Stats_btn=QtGui.QPushButton("System Stats",self)
+        self.Stats_btn.clicked.connect(self.setStatsPage)
+	
+        # Create Logout button        
+	self.Logout_btn=QtGui.QPushButton("Logout",self)
+        self.Logout_btn.clicked.connect(self.setLogoutPage)
 
 	# Now create layout
         wid = QtGui.QWidget(self)
         self.setCentralWidget(wid)
 
 	# put buttons in an hbox
-	hbox = QtGui.QHBoxLayout()
-        hbox.addWidget(self.Arm_btn)
-        hbox.addWidget(self.Disarm_btn)
+	vbox2 = QtGui.QVBoxLayout()
+        vbox2.addWidget(self.LED_btn)
+        vbox2.addWidget(self.Voice_btn)
+        vbox2.addWidget(self.Stats_btn)
+        vbox2.addWidget(self.Logout_btn)
         
 	# put buttons + status in a vbox
 	vbox = QtGui.QVBoxLayout()
         vbox.addWidget(self.user_data)
-        vbox.addWidget(self.state)
+        vbox.addWidget(self.voice_status)
     
         # combine layouts
-        vbox.addLayout(hbox)
+        vbox.addLayout(vbox2)
 	wid.setLayout(vbox)
 
         self.setGeometry(50,50,600,400)
-        self.setWindowTitle('Project 2 Demo')
+        self.setWindowTitle('Main Page')
         self.show()
 
 
-        
-    def sendLEDsOn(self):
+
+    def setStatsPage(self):
         """
         Change the state of the Arm_status table in MySQL to 'armed'
         """
-
-        print("TODO SET LEDS ON")
-        self.state.setText('Would have set LEDs ON')
-        if self.ws is None:
-            pass
-        else:
-            print("ARM SYSTEM")        
-            #self.ws.write_message("set_arm")
+        self.window_state = WindowState.STATS_WINDOW
+        self.set_window_to_state()
 
 
-    def sendLEDsOff(self):
+    def setLEDPage(self):
         """
         Change the state of the Arm_status table in MySQL to 'disarmed'
         """
-
-        self.state.setText('Would have set LEDs OFF')
-        print("TODO SET LEDS OFF")
-        if self.ws is None:
-            #self.connect()
-            pass
-        else:
-            print("DISARM SYSTEM")        
-            self.ws.write_message("set_dis")
-
+        self.window_state = WindowState.LED_WINDOW
+        self.set_window_to_state()
+    
+    def setVoicemode(self):
+        """
+        Switching the voice mode on
+        """
         
+        self.voice_status.setText("Voice Mode ON")
+        self.voice_status.repaint()
+        Hub_voice(self)
+        
+        
+    def setLogoutPage(self):
+        """
+        Change the state of the Arm_status table in MySQL to 'disarmed'
+        """
+        self.myAWSIoTMQTTClient.publish("AccessControl/UserPass", json.dumps({"user_name":"","password":""}), 1)
+        self.window_state = WindowState.LOCK_WINDOW
+        self.set_window_to_state()
+
+
     @gen.coroutine
     def connect(self):
         """
@@ -298,7 +362,6 @@ class Hub(QtGui.QMainWindow):
             if self.drop_count >= 2:
 		    self.statusBar().showMessage('Connection Error!')
                     self.user_data.setText("Disconnected!")
-                    self.state.setText("")
             return
 
         self.drop_count = 0
@@ -309,7 +372,7 @@ class Hub(QtGui.QMainWindow):
         if indata[0] == "name" :
             self.user_data.setText("Welcome, "+indata[1])
         elif indata[0] == "state" :
-            self.state.setText("Arm/Disarm state is: "+indata[1])
+            pass
         #print ("Received Data: '"+indata[1]+"'")
 
 
@@ -349,5 +412,8 @@ class Hub(QtGui.QMainWindow):
 if __name__ == "__main__":
     """ Run program if called as main function """
     app = QtGui.QApplication(sys.argv)
-    hub=Hub()
-    sys.exit(app.exec_())
+    try:
+        hub=Hub()
+        sys.exit(app.exec_())
+    except KeyboardInterrupt:
+        sys.exit(-1) 
