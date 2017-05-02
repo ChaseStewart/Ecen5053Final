@@ -170,7 +170,7 @@ class FingerPi():
             raise RuntimeError("Couldn't send packet")
 
     def DeleteId(self, ID):
-        if self.sendCommand('DeleteId', ID):
+        if self.sendCommand('DeleteID', ID):
             return [self.getResponse(), None]
         else:
             raise RuntimeError("Couldn't send packet")

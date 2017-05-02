@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import sys, json
+import sys, json, numpy
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado import gen
 from tornado.websocket import websocket_connect
@@ -56,14 +56,11 @@ class Enrolling(QtGui.QMainWindow):
         	else:
 			
         		self.statusBar().showMessage("Registration Successful")
+                        access.pubaddFingerprint(self.Enteredname.text(),self.Enroll_result)
+                
 	def Delete(self):
-		my_Delete = Deleting()
-		self.Delete_result = my_Delete.runscript()
-		if self.Delete_result is None:
-			self.statusBar().showMessage("Deletion failed")
-		else:
-			self.statusBar().showMessage("Deleted successfully")
-
+                access.pubrmFingerprint(self.Enteredname.text())
+	
 class Access(QtGui.QMainWindow):
     """
     The top-level class of the project2 Hub R Pi GUI-
@@ -115,7 +112,7 @@ class Access(QtGui.QMainWindow):
 
             self.WORK_PERIOD = 2000 
             self.myTimer = QTimer()
-            self.myTimer.connect(self.processSQS)
+            self.myTimer.timeout.connect(self.processSQS)
             self.myTimer.start(self.WORK_PERIOD)
 
 
@@ -169,8 +166,28 @@ class Access(QtGui.QMainWindow):
             for msg in m:
                 body   = msg['Body']
                 acked_messages.append(msg['ReceiptHandle'])
-                
+                json_body = json.loads(body)
+                print(json_body)
+                if json_body['type'] == 'rm_index':
+                        user_id = json_body['user_id']
+                        my_Delete = Deleting()
+                        self.Delete_result = my_Delete.runscript(user_id)
+                        if self.Delete_result is None:
+                                self.statusBar().showMessage("Deletion failed")
+                        else:
+                                self.statusBar().showMessage("Deleted successfully")
 
+                elif json_body['type'] == 'login':
+                        
+                        arm_state = json_body['arm_state']
+                        user = json_body['username']
+                        access_lvl = json_body['access']
+                        if arm_state == "Armed": 
+                            self.state.setText("System is ARMED")
+                            self.user_data.setText("")
+                        else:
+                            self.state.setText("")
+                            self.user_data.setText("Welcome, %s!" % user)
 
             # Now delete the ack'ed message
             for item in acked_messages:
@@ -179,7 +196,7 @@ class Access(QtGui.QMainWindow):
         # otherwise just return
         else:
             return
-`
+
 
  
     def pubFingerprint(self, state, uname):
@@ -215,6 +232,34 @@ class Access(QtGui.QMainWindow):
         print("PUB USER PASS\n\tSending user:%s, password:%s" % (uname, "*"*(len(passwd)-4)+passwd[-3:]))
         self.myAWSIoTMQTTClient.publish("AccessControl/UserPass", str(jsonData), 1)
 
+
+    def pubaddFingerprint(self, name, user_id):
+        """
+        Publish new Fingerprint added to AWS       
+        """
+        usrData = {}
+        if name == None:
+                name="None"
+        if user_id == None:
+                user_id="None"
+        usrData['name']=str(name) 
+        usrData['user_id']  =str(user_id) 
+        jsonData = json.dumps(usrData)
+        print("PUB to addFINGERPRINT\n\t username:%s, user_id:%s" % (name,user_id))
+        self.myAWSIoTMQTTClient.publish("AccessControl/addFingerprint", str(jsonData), 1)
+
+    def pubrmFingerprint(self, name):
+        """
+        Publish new Fingerprint added to AWS       
+        """
+        usrData = {}
+        if name == None:
+                name="None"
+        usrData['name']=str(name) 
+        #usrData['user_id']  =str(user_id) 
+        jsonData = json.dumps(usrData)
+        print("PUB FINGERPRINT\n\t username:%s" % (name))
+        self.myAWSIoTMQTTClient.publish("AccessControl/rmFingerprint", str(jsonData), 1)
 
 
     def initUI(self):
@@ -274,38 +319,38 @@ class Access(QtGui.QMainWindow):
 	self.statusBar()
 	self.statusBar().setStyleSheet("color: red; font-size:18pt")
 
-	# Create Arm button        
-	Arm_btn=QtGui.QPushButton("Fingerprint Fail",self)
-        Arm_btn.clicked.connect(self.simFingerprintFailure)
-	
+		
 	# Create Disarm button        
-	Disarm_btn=QtGui.QPushButton("Fingerprint Success",self)
-        Disarm_btn.clicked.connect(self.simFingerprintSuccess)
+	Disarm_btn=QtGui.QPushButton("Finger print Access",self)
+        Disarm_btn.clicked.connect(self.verify)
 
 	# Now create layout
         wid = QtGui.QWidget(self)
         self.setCentralWidget(wid)
 
 	# put buttons in an hbox
-	hbox = QtGui.QHBoxLayout()
-        hbox.addWidget(Arm_btn)
-        hbox.addWidget(Disarm_btn)
-        
+        status_box=QtGui.QVBoxLayout()
+        status_box.addWidget(self.user_data)
+        status_box.addWidget(self.state)
+
 	# put buttons + status in a vbox
 	vbox = QtGui.QVBoxLayout()
-        vbox.addWidget(self.user_data)
-        vbox.addWidget(self.state)
         vbox.addLayout(self.unamebox)
         vbox.addLayout(self.passwdbox)
-        
-        #fingerprint button
-        fingerprintbox = QtGui.QVBoxLayout()
-        fingerprintbox.addWidget(self.fingerprint_btn)
-        fingerprintbox.addLayout(vbox)
-        # combine layouts
-        fingerprintbox.addLayout(hbox)
-	wid.setLayout(fingerprintbox)
 
+        #access buttons 
+        hbox = QtGui.QHBoxLayout()
+        hbox.addWidget(Disarm_btn)
+        hbox.addLayout(vbox)
+        
+        #combine widgets
+        fingerprintbox = QtGui.QVBoxLayout()
+        fingerprintbox.addLayout(status_box)
+        fingerprintbox.addLayout(hbox)
+
+        #set layout
+	wid.setLayout(fingerprintbox)
+        wid.setLayout(hbox)
         self.setGeometry(50,50,600,400)
         self.setWindowTitle('Project 2 Demo')
         self.show()
@@ -313,12 +358,14 @@ class Access(QtGui.QMainWindow):
     def verify(self):
         my_verify = verifier()
         print("Verification")
+        self.statusBar().showMessage("Press your finger")
         self.verify_result = my_verify.runscript()
         if self.verify_result is None:
-    		self.pubAccessState("Armed")
+    		#self.pubAccessState("Armed")
         	self.statusBar().showMessage("Access Denied")	
         else:
-    		self.pubAccessState("Disarmed")
+    		#self.pubAccessState("Disarmed")
+                self.pubFingerprint(state="Success", uname=self.verify_result)
 		self.hide()
         	self.newWindow= Enrolling(self)
                 
@@ -331,6 +378,8 @@ class Access(QtGui.QMainWindow):
         uname =self.input1.text()
         passwd=self.input2.text()
         self.pubUserPass(uname, passwd)
+        self.hide()
+        self.newWindow= Enrolling(self)
         return
 
 
@@ -339,12 +388,9 @@ class Access(QtGui.QMainWindow):
         """
         Change the state of the Arm_status table in MySQL to 'disarmed' and set current user
         """
-        rand_ID = int(numpy.floor(numpy.random.uniform(0,5)))
+        rand_ID = int(numpy.floor(numpy.random.uniform(0,4)))
+	
         self.pubFingerprint(state="Success", uname=rand_ID)
-            self.WORK_PERIOD = 2000 
-            self.myTimer = QTimer()
-            self.myTimer.connect(self.processSQS)
-            self.myTimer.start(self.WORK_PERIOD)
         return
 
 

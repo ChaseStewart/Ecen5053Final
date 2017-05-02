@@ -7,14 +7,14 @@ import time
 class Deleting:
     def __init__(self):
         pass
-    def runscript(self):
+    def runscript(self,ID):
         f = fp.FingerPi()
         print 'Opening connection...'
         f.Open(extra_info = True, check_baudrate = True)
 
         while True:
             print 'Deleting all previous id'
-            response = f.DeleteAll()
+            response = f.DeleteId(ID)
             if response[0]['ACK']:
                 break
             else:
