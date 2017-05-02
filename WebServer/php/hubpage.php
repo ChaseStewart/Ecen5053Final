@@ -25,11 +25,21 @@
 			<!--to connect to the databse and get data to display in the table -->
 			<?php
                                 /* details to connect to database*/
+<<<<<<< HEAD
+				$host = "embintdes.cyjeijyfmmbt.us-west-2.rds.amazonaws.com:3306";
+				$user = "cstewart";
+				$db_name= "users_data";
+				$passwd="3mb1ntd3s";
+
+                                /* connect to sql**/
+				$con = mysql_connect($host, $user, $passwd);
+=======
 				$host = "localhost";
 				$user = "root";
 				$db_name= "users_data";
                                 /* connect to sql**/
 				$con = mysql_connect($host, $user);
+>>>>>>> master
 				if (!$con) 
 				{ 
 					die('Could not connect: ' . mysql_error()); 
@@ -73,7 +83,7 @@
 			<div class="col-md-4"></div>
 			<div class="col-md-6">
 				<button class="btn btn-info btn-lg" onclick="window.location='users_data.php'">Users</button><br /><br />
-				<button class="btn btn-info btn-lg" onclick="alert('Not yet implemented!');">Lights</button><br /><br />
+				<button class="btn btn-info btn-lg" onclick="window.location='set_LEDs.php'">LEDs</button><br /><br />
 				<!--<button class="btn btn-info btn-lg" onclick="alert('Not yet implemented!');">Music</button><br /><br /> -->
 				<button class="btn btn-info btn-lg" onclick="alert('Not yet implemented!');">Stats</button><br /><br />
 				<button class="btn btn-info btn-lg" onclick="alert('Not yet implemented!');">Settings</button>
