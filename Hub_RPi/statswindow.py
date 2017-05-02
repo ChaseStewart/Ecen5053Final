@@ -72,7 +72,7 @@ class DynamicGraph(graphCanvas):
 		self.ax2.set_ylim(0,1)
 
 
-	def update_figure(self, humData, tempData):
+	def update_figure(self, lights_on, lights_of):
 		"""
 		Update the line chart w/ data from the caller
 		"""
@@ -104,11 +104,16 @@ class StatsWindow(QtGui.QMainWindow):
         initialize this window
         """
 	super(StatsWindow, self).__init__(parent)
-        self.red = None
-        self.blue = None
-        self.green = None
-        self.lights_on = None
-        self.lights_of = None
+        self.red = 0
+        self.blue = 0
+        self.green = 0
+        self.parent = parent
+        self.lights_on = 0
+        self.lights_of = 0
+        # measurement data vars
+	self.lights_ondata = [0]*10
+	self.lights_ofdata  = [0]*10
+	self.plotCount = 0
         self.initUI()
 
 
@@ -162,23 +167,40 @@ class StatsWindow(QtGui.QMainWindow):
 
 
     def printStats(self):
-
         self.red = self.parent.red
         self.green = self.parent.green
         self.blue = self.parent.blue
+        print self.red
+        print self.green
+        print len(self.lights_ondata)
         if self.red !=0 or self.blue != 0  or self.green !=0:
-            lights_on = 1
-            lights_of = 0
+            self.lights_on = 1
+            self.lights_of = 0
+            
         else:
-            lights_of = 1
-            lights_on = 0
-        return
+            self.lights_of = 1
+            self.lights_on = 0
+
+	# When count < len(graph), just populate graph
+	if self.plotCount < 10:
+                self.lights_ondata[self.plotCount] = self.lights_on
+		self.lights_ofdata[self.plotCount] = self.lights_of
+		self.plotCount += 1	
+			
+	# then keep rolling the chart over
+	else:
+                self.lights_ondata[0] = self.lights_on
+		self.lights_ondata = np.roll(self.lights_ondata, len(self.lights_ondata)-1)		
+		self.lights_ofdata[0] = self.lights_of
+		self.lights_ofdata = np.roll(self.lights_ofdata, len(self.lights_ofdata)-1)
+
+	self.canvas.update_figure(self.lights_ondata, self.lights_ofdata)
 
     def timerStart(self):
 		"""
 		Start the timer
 		"""	
-		self.timer.start(100000)
+		self.timer.start(1000)
 		return
 
 
@@ -189,5 +211,6 @@ class StatsWindow(QtGui.QMainWindow):
 
 
     def teardown(self):
+        self.timer.stop()
         self.close()
 
