@@ -15,7 +15,7 @@ from helpers import WindowState
 from lockedwindow import LockedWindow
 from ledwindow import LEDWindow
 from statswindow import StatsWindow
-
+from hub_voice import Hub_voice
 
 
 class Hub(QtGui.QMainWindow):
@@ -204,7 +204,7 @@ class Hub(QtGui.QMainWindow):
             # Now delete the ack'ed message
             for item in acked_messages:
                 self.client.delete_message(QueueUrl=self.queue, ReceiptHandle=item)
-
+            return self.logged_in_user
         # otherwise just return
         else:
             return
@@ -228,6 +228,10 @@ class Hub(QtGui.QMainWindow):
         self.user_data.setFont(font)
         self.user_data.setText("No Logged In User")
 
+        # Create voice_status label
+        self.voice_status=QtGui.QLabel(self)
+        self.voice_status.setFont(font)
+        self.voice_status.setText("Voice Mode off")
 
 	# Create status bar
 	self.statusBar()
@@ -236,6 +240,11 @@ class Hub(QtGui.QMainWindow):
 	# Create LED button
 	self.LED_btn=QtGui.QPushButton("LED Settings",self)
         self.LED_btn.clicked.connect(self.setLEDPage)
+
+        # Create Voice mode button
+	self.Voice_btn=QtGui.QPushButton("Voice Mode",self)
+        self.Voice_btn.clicked.connect(self.setVoicemode)
+        
 
 	# Create Stats button        
 	self.Stats_btn=QtGui.QPushButton("System Stats",self)
@@ -252,12 +261,14 @@ class Hub(QtGui.QMainWindow):
 	# put buttons in an hbox
 	vbox2 = QtGui.QVBoxLayout()
         vbox2.addWidget(self.LED_btn)
+        vbox2.addWidget(self.Voice_btn)
         vbox2.addWidget(self.Stats_btn)
         vbox2.addWidget(self.Logout_btn)
         
 	# put buttons + status in a vbox
 	vbox = QtGui.QVBoxLayout()
         vbox.addWidget(self.user_data)
+        vbox.addWidget(self.voice_status)
     
         # combine layouts
         vbox.addLayout(vbox2)
@@ -283,7 +294,16 @@ class Hub(QtGui.QMainWindow):
         """
         self.window_state = WindowState.LED_WINDOW
         self.set_window_to_state()
-
+    
+    def setVoicemode(self):
+        """
+        Switching the voice mode on
+        """
+        
+        self.voice_status.setText("Voice Mode ON")
+        self.voice_status.repaint()
+        Hub_voice(self)
+        
         
     def setLogoutPage(self):
         """
