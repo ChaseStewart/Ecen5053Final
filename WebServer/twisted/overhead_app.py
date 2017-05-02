@@ -81,6 +81,7 @@ class WSProto(WebSocketServerProtocol):
 		print ("Delta time is "+str(delta))
 
 		jsondata = {}
+		jsondata['type'] = 'overhead'
 		jsondata['proto'] = 'WebSocket'
 		jsondata['byte'] = len(payload)
 		jsondata['time'] = delta
@@ -102,6 +103,7 @@ class CoAPProto(resource.CoAPResource):
 		print("packet_len is "+str(len(request.payload)))
 		print ("Delta time is "+str(delta))
 		jsondata = {}
+		jsondata['type'] = 'overhead'
 		jsondata['proto'] = 'CoAP'
 		jsondata['byte'] = len(request.payload)
 		jsondata['time'] = delta
@@ -169,6 +171,7 @@ class MQTTProto(ClientService):
 		print ("Delta time is "+str(delta))
 		
 		jsondata = {}
+		jsondata['type'] = 'overhead'
 		jsondata['proto'] = 'MQTT'
 		jsondata['byte'] = len(payload)
 		jsondata['time'] = delta
