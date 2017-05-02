@@ -9,7 +9,7 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import QTimer
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from boto3.session import Session
-
+from random import randint
 # all windows
 from helpers import WindowState
 from lockedwindow import LockedWindow
@@ -51,6 +51,9 @@ class Hub(QtGui.QMainWindow):
         self.first_time  = True
         self.drop_count  = 0
         self.toggle      = 0
+        self.red = 0
+        self.green = 0
+        self.blue = 0
 
 	# Tornado Variables
         self.ioloop = IOLoop.instance()
@@ -191,6 +194,9 @@ class Hub(QtGui.QMainWindow):
 
                 self.logged_in_user = my_user    
                 self.access = int(access)
+                self.red = randint(0,255)
+                self.green = randint(0,255)
+                self.blue = randint(0,255)
 
                 if arm_state == "Armed":
                     self.window_state = WindowState.LOCK_WINDOW

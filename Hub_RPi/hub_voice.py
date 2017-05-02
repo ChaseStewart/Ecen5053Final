@@ -16,6 +16,7 @@ import re
 import sys
 from wordsegment import segment
 from PyQt4 import QtGui, QtCore
+from PyQt4.QtGui import QSound
 
 class Hub_voice(QtGui.QMainWindow):
     
@@ -47,13 +48,13 @@ class Hub_voice(QtGui.QMainWindow):
                 Resp_Text = self.speech_text.recognize_google(audio)
                 print("You said: " + Resp_Text)
                 #self.name = re.search('purple',Resp_Text.lower())
-                #self.logout = re.search('logout',Resp_Text.lower())
+                self.logout = re.search('logout',Resp_Text.lower())
                 #self.light_on = re.search('lights on',Resp_Text.lower())
                 #self.light_of = re.search('lights off',Resp_Text.lower())
                 self.user_name = re.search('who am i',Resp_Text.lower())
                 self.music = re.search('music',Resp_Text.lower())
                 self.next = re.search('next',Resp_Text.lower())
-                self.previous = re.search('previous',Resp_Text.lower())
+                self.last = re.search('previous',Resp_Text.lower())
                 self.stop = re.search('stop',Resp_Text.lower())
 
                 if self.user_name!= None :
@@ -88,12 +89,10 @@ class Hub_voice(QtGui.QMainWindow):
                     else:
                         self.count = 0
 
-                if self.previous!=None:
-                    print ('in previous')
-                    print (self.count)
+                if self.last!=None:
                     fnames = os.listdir("/media/pi/B214-AB4E/Testing")
                     self.count=self.count-1
-                    if self.count >= 0 :
+                    if self.count > 0 :
                         print fnames[self.count]
                         path = "mpg321 -K /media/pi/B214-AB4E/Testing/"+fnames[self.count]+" &"
                         print path
@@ -105,6 +104,15 @@ class Hub_voice(QtGui.QMainWindow):
 
                 if self.stop!=None:
                     os.system("pkill mpg321")
+
+                if self.logout!= None :
+                    a=self.parent.setLogoutPage()
+                    if a != None:
+                        tts = gTTS(text="Logged out successfully", lang='en')
+                        tts.save("good.mp3")
+                        os.system("mpg321 good.mp3 &")
+                        time.sleep(2)
+                
                 
 
 
