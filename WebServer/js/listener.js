@@ -21,7 +21,7 @@ function publishRGB(Red,Green,Blue){
 	   debug: false
 	});
 
-	device.publish('AccessControl/set_leds', JSON.stringify({"red":Red, "green":Green, "blue":Blue	}));
+	device.publish('AccessControl/set_leds', JSON.stringify({"type":"led","red":Red, "green":Green, "blue":Blue	}));
 
 	//
 	// Do a simple publish/subscribe demo based on the test-mode passed
