@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*
 
 import sys, json, numpy
+import opc
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado import gen
 from tornado.websocket import websocket_connect
@@ -15,7 +16,7 @@ from helpers import WindowState
 from lockedwindow import LockedWindow
 from ledwindow import LEDWindow
 from statswindow import StatsWindow
-from hub_voice import Hub_voice
+#from hub_voice import Hub_voice
 
 
 class Hub(QtGui.QMainWindow):
@@ -56,6 +57,12 @@ class Hub(QtGui.QMainWindow):
         self.ioloop = IOLoop.instance()
         self.ws = None
 
+	# LED vars
+	self.num_pixels = 60
+	self.led_addr   = 'localhost:7890'
+	self.led_client = opc.Client(self.led_addr)
+	self.fast_transition = True
+
 	# initalize the GUI
         self.initUI()
 
@@ -79,6 +86,13 @@ class Hub(QtGui.QMainWindow):
             self.myTimer = QTimer()
             self.myTimer.timeout.connect(self.processSQS)
             self.myTimer.start(self.WORK_PERIOD)
+
+
+	if self.led_client.can_connect():
+		print('Connected to: '+self.led_addr)
+	else:
+		print('NOT Connected to: '+self.led_addr)
+
 
         self.window_state = WindowState.LOCK_WINDOW
         self.set_window_to_state()
@@ -184,27 +198,38 @@ class Hub(QtGui.QMainWindow):
                 acked_messages.append(msg['ReceiptHandle'])
 		print body
                 json_body = json.loads(body)
-                
-                arm_state = json_body['arm_state']
-                my_user   = json_body['username']
-                access    = json_body['access']       
 
-                self.logged_in_user = my_user    
-                self.access = int(access)
+		if json_body['type'] == 'login':               
+ 
+			arm_state = json_body['arm_state']
+			my_user   = json_body['username']
+			access    = json_body['access']       
 
-                if arm_state == "Armed":
-                    self.window_state = WindowState.LOCK_WINDOW
-                    self.set_window_to_state()
+			self.logged_in_user = my_user    
+			self.access = int(access)
 
-                else:
-		    self.user_data.setText("Welcome, "+str(self.logged_in_user))
-                    self.window_state = WindowState.MAIN_WINDOW 
-                    self.set_window_to_state()
+			if arm_state == "Armed":
+			    self.window_state = WindowState.LOCK_WINDOW
+			    self.set_window_to_state()
+
+			else:
+			    self.user_data.setText("Welcome, "+str(self.logged_in_user))
+			    self.window_state = WindowState.MAIN_WINDOW 
+			    self.set_window_to_state()
+
+		elif json_body['type'] == 'led':
+			if self.window_state != WindowState.LOCK_WINDOW:
+				r_val = json_body['red']
+				b_val = json_body['blue']
+				g_val = json_body['green']
+
+				self.setLEDs(r_val, g_val, b_val)
 
             # Now delete the ack'ed message
             for item in acked_messages:
                 self.client.delete_message(QueueUrl=self.queue, ReceiptHandle=item)
             return self.logged_in_user
+
         # otherwise just return
         else:
             return
@@ -313,6 +338,26 @@ class Hub(QtGui.QMainWindow):
         self.window_state = WindowState.LOCK_WINDOW
         self.set_window_to_state()
 
+
+    def setLEDs(self, red, green, blue):
+
+	out_list = []
+        my_tuple = (red, green, blue)
+	
+	for i in range(self.num_pixels):
+            out_list.append(my_tuple)
+	
+	if self.led_client.put_pixels(out_list, channel=0):
+		pass
+	else:
+		print("Not connected!")
+
+	if self.fast_transition:	
+		if self.led_client.put_pixels(out_list, channel=0):
+			pass
+		else:
+			print("Not connected!")
+	return
 
     @gen.coroutine
     def connect(self):
