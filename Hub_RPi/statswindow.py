@@ -14,9 +14,9 @@ import matplotlib
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
+# protocol testing libraries
 import paho.mqtt.publish as publish
 import websocket
-
 from coapthon.client.helperclient import HelperClient
 
 class graphCanvas(FigureCanvas):
@@ -68,7 +68,7 @@ class DynamicGraph(graphCanvas):
 		self.ax3 = self.axes.twinx()
 		self.ax4 = self.axes.twinx()
 		
-		self.ax3.plot(range(10), [np.NaN]*10,'r')
+		self.ax3.plot(range(10), [np.NaN]*10,'r', label='dummy1')
 		self.axes.set_ylabel('axis 1', color='r')
 		self.axes.set_ylim(-1,2)
 
@@ -77,12 +77,16 @@ class DynamicGraph(graphCanvas):
 		
 		# set up blue plot
 		
-		self.ax2.plot(range(10), [np.NaN]*10, 'b')
+		self.ax2.plot(range(10), [np.NaN]*10, 'b', label='dummy2')
 		self.ax2.set_ylabel('axis 2', color='b')
 		self.ax2.set_ylim(-1,2)
-		self.ax3.set_ylim(-1,2)
-		self.ax4.set_ylim(-1,2)
+                self.ax2.get_yaxis().set_ticks([])
 
+		self.ax3.set_ylim(-1,2)
+                self.ax3.get_yaxis().set_ticks([])
+
+		self.ax4.set_ylim(-1,2)
+                self.ax4.get_yaxis().set_ticks([])
 
 
 	def update_figure(self, graph_type, led1array, led2array, array3=None ):
@@ -91,58 +95,71 @@ class DynamicGraph(graphCanvas):
 		"""
 
 		# need to clear axes to place new data
-		self.ax3.cla()
-		self.ax2.cla()
-		self.ax4.cla()
 		self.axes.cla()
+		self.ax2.cla()
+		self.ax3.cla()
+		self.ax4.cla()
 
-		self.ax2 = self.axes.twinx()
-		self.ax3 = self.axes.twinx()
 
 		if graph_type == GraphState.LIGHTS:
                         
                         self.axes.set_ylabel('Lights ON ', color='r')
                         self.axes.set_title('Usage of Lights ')
-	
+                        self.axes.set_ylim(-1,2)
+
                         self.ax2.set_ylabel('Lights Off', color='b')
+                        self.ax2.plot(range(10), led2array, 'b', label="Lights Off")
                         self.ax2.set_ylim(-1,2)
-                        self.ax2.plot(range(10), led2array, 'b')
+                        self.ax2.get_yaxis().set_ticks([])
 
+                        self.ax3.plot(range(10),led1array,'r', label="Lights On")
                         self.ax3.set_ylim(-1,2)
-                        self.ax3.plot(range(10),led1array,'r')
+                        self.ax3.get_yaxis().set_ticks([])
                         
-                if graph_type == GraphState.OVERHEAD:
+                        self.ax4.set_ylim(-1,2)
+                        self.ax4.get_yaxis().set_ticks([])
 
-        		self.ax4 = self.axes.twinx()
+			self.legend = self.axes.legend(loc='center', shadow=True)	
+
+                if graph_type == GraphState.RGB:
                         
-                        #self.axes.set_ylabel('overhead(bytes) ', color='r')
-                        self.axes.set_title('Latency for all protocols ')
-                        self.axes.set_ylabel('Latency', color='k')
+                        self.axes.set_ylabel('Value (0-255) ', color='k')
+                        self.axes.set_title('Color on LEDs ')
+                        self.axes.set_ylim(0,256)
 
+                        self.ax2.plot(range(10), led2array, 'b', label="Blue")
+                        self.ax2.set_ylim(0,256)
+                        self.ax2.get_yaxis().set_ticks([])
 
-                        self.ax3.plot(range(10),led1array,'r')
-                        self.ax3.set_ylim(0,1)
+                        self.ax3.plot(range(10),led1array,'r', label="Red")
+                        self.ax3.set_ylim(0,256)
+                        self.ax3.get_yaxis().set_ticks([])
 		
-                        self.ax2.set_ylim(0,1)
-                        self.ax2.plot(range(10), led2array, 'b')
-
-                        self.ax4.set_ylim(0,1)
-                        self.ax4.plot(range(10), array3, 'g')
+                        self.ax4.plot(range(10), array3, 'g', label="Green")
+                        self.ax4.set_ylim(0,256)
+                        self.ax4.get_yaxis().set_ticks([])
+			
+			self.legend = self.axes.legend(loc='center', shadow=True)	
                         
                 if graph_type == GraphState.LATENCY:
-        		self.ax4 = self.axes.twinx()
                         
                         self.axes.set_title('Latency for all protocols ')
                         self.axes.set_ylabel('Latency', color='k')
+			self.axes.set_ylim(0,1)
                         
+                        self.ax2.plot(range(10), led2array, 'b', label="CoAP")
 			self.ax2.set_ylim(0,1)
-                        self.ax2.plot(range(10), led2array, 'b')
+                        self.ax2.get_yaxis().set_ticks([])
 
-                        self.ax3.plot(range(10),led1array,'r')
-                        self.ax3.set_ylim(0,1)
+                        self.ax3.plot(range(10),led1array,'r', label="WS")
+			self.ax3.set_ylim(0,1)
+                        self.ax3.get_yaxis().set_ticks([])
 
-                        self.ax4.set_ylim(0,1)
-                        self.ax4.plot(range(10), array3, 'g')
+                        self.ax4.plot(range(10), array3, 'g', label="MQTT")
+			self.ax4.set_ylim(0,1)
+                        self.ax4.get_yaxis().set_ticks([])
+			
+			self.legend = self.axes.legend(loc='center', shadow=True)	
 
                 self.draw()
 
@@ -168,18 +185,26 @@ class StatsWindow(QtGui.QMainWindow):
         self.lights_of  = 0
         self.graph_type = None
         
-        # measurement data vars
+        # Light on arrays
 	self.led1array    = [np.NaN]*10
 	self.led2array    = [np.NaN]*10
 	self.array3       = [np.NaN]*10
 	self.plotCount = 0
 
+	# Proto Latency arrays
         self.wsArray   = [np.NaN] * 10 
 	self.mqttArray = [np.NaN] * 10
 	self.coapArray = [np.NaN] * 10
 	self.latencyCount = 0
 
-        self.initUI()
+	# RGB arrays
+        self.redArray   = [np.NaN] * 10 
+	self.blueArray  = [np.NaN] * 10
+	self.greenArray = [np.NaN] * 10
+	self.rgbCount = 0
+        
+	self.initUI()
+
 
 
     def initUI(self):
@@ -194,15 +219,15 @@ class StatsWindow(QtGui.QMainWindow):
 	self.timer = QTimer()
 	self.timer.stop()
 	
-	# button to set automatic data capture
+	# button for lights on
 	self.lights = QtGui.QPushButton('Lights', self)
 	self.lights.setToolTip('Click to get status of lights in rooms')
 	self.lights.clicked.connect(self.ledTimerStart)
 
 	# button for overhead
-        self.overhead = QtGui.QPushButton('Overhead', self)
-	self.overhead.setToolTip('Click to find the overhead for protocols')
-	self.overhead.clicked.connect(self.overheadTimerStart)
+        self.overhead = QtGui.QPushButton('RGB', self)
+	self.overhead.setToolTip('Click to graph the red, green, blue displayed in the LEDs')
+	self.overhead.clicked.connect(self.RGBTimerStart)
 
 	# button for latency
         self.latency = QtGui.QPushButton('Latency', self)
@@ -213,7 +238,6 @@ class StatsWindow(QtGui.QMainWindow):
         self.stats=QtGui.QLabel(self)
         self.stats.setFont(self.font)
         self.stats.setText("System Stats")
-        
         
         # put buttons + status in a vbox
         self.goback=QtGui.QPushButton("Back",self)
@@ -298,21 +322,42 @@ class StatsWindow(QtGui.QMainWindow):
 
 
 
-    def overheadStats(self):
-        print("Not implemented! Overhead")
-	#self.canvas.update_figure(GraphState.OVERHEAD, self.ws_ovh, self.coap_ovh, self.mqtt_ovh)
+    def RGBStats(self):
+        
+	#vars to get the RGB values from parent
+        self.red   = self.parent.red
+        self.green = self.parent.green
+        self.blue  = self.parent.blue
+        
+	# When count < len(graph), just populate graph
+	if self.rgbCount < 10:
+                self.redArray[self.rgbCount]   = self.red
+		self.blueArray[self.rgbCount]  = self.blue
+		self.greenArray[self.rgbCount] = self.green
+		self.rgbCount += 1	
+			
+	# then keep rolling the chart over
+	else:
+                self.redArray[0] = self.red
+		self.redArray = np.roll(self.redArray, len(self.redArray)-1)		
+                self.blueArray[0] = self.blue
+		self.blueArray = np.roll(self.blueArray, len(self.blueArray)-1)		
+                self.greenArray[0] = self.green
+		self.greenArray = np.roll(self.greenArray, len(self.greenArray)-1)		
+
+	self.canvas.update_figure(GraphState.RGB, self.redArray, self.blueArray, self.greenArray)
         return
 
 
 
-    def overheadTimerStart(self):
+    def RGBTimerStart(self):
 	"""
 	Start the timer with timeout set to latency calculation
 	"""	
 	self.timer.stop()
         self.timer =  QTimer()
-       	self.timer.timeout.connect(self.overheadStats)
-	self.timer.start(3000)
+       	self.timer.timeout.connect(self.RGBStats)
+	self.timer.start(500)
         return
 
 
@@ -323,7 +368,7 @@ class StatsWindow(QtGui.QMainWindow):
 	self.timer.stop()
 	self.timer =  QTimer()
        	self.timer.timeout.connect(self.startTests)
-	self.timer.start(3000)
+	self.timer.start(1500)
         return
 
 
@@ -334,7 +379,7 @@ class StatsWindow(QtGui.QMainWindow):
 	self.timer.stop()
 	self.timer =  QTimer(self)
        	self.timer.timeout.connect(self.ledStats)
-	self.timer.start(3000)
+	self.timer.start(500)
         return
 
 
@@ -356,17 +401,23 @@ class StatsWindow(QtGui.QMainWindow):
 	try:
         	response = client.put(path, str(curr_time), timeout=0.1)
 	except Exception as e:
-		print("Exception: %s" % e)
+		pass # expected because we will not receive a response from the listener
         client.stop()
+
+
 
     def testMQTT(self):
         curr_time = time()
         publish.single("AccessControl/MQTT_test", str(curr_time), hostname="test.mosquitto.org") 
 
+
+
     def testWebsockets(self):
         ws = websocket.create_connection("ws://52.34.209.113:8000")
         curr_time = time()
 	ws.send(str(curr_time))
+
+
 
     def goBack(self):
         self.parent.window_state = WindowState.MAIN_WINDOW

@@ -15,5 +15,5 @@ class GraphState(object):
     Just a state machine for the hub graph states
     """
     LIGHTS  = 0
-    OVERHEAD  = 1
-    LATENCY   = 2
+    RGB     = 1
+    LATENCY = 2
