@@ -5,11 +5,11 @@ import sys, json, numpy
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import QTimer
 from helpers import WindowState
+from helpers import GraphState
 import numpy as np
 
 # MatPlotLib setup
 import matplotlib
-matplotlib.use('Qt4Agg')
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
@@ -59,39 +59,98 @@ class DynamicGraph(graphCanvas):
 		"""
 		
 		# set up red plot
-		self.axes.plot(range(10), [np.nan]*10,'r')
-		self.axes.set_xlabel('Time')
-		self.axes.set_ylabel('Lights ON ', color='r')
-		self.axes.set_ylim(0,1)
-		self.axes.set_title('Usage of Lights ')
+		self.ax2 = self.axes.twinx()
+		self.ax3 = self.axes.twinx()
+		self.ax4 = self.axes.twinx()
+		
+		self.ax3.plot(range(10), [np.NaN]*10,'r')
+		self.axes.set_ylabel('axis 1', color='r')
+		self.axes.set_ylim(-1,1)
+
+		self.axes.set_xlabel('Sample')
+		self.axes.set_title('Choose a stat to graph')
 		
 		# set up blue plot
-		self.ax2 = self.axes.twinx()
-		self.ax2.plot(range(10), [np.nan]*10, 'b')
-		self.ax2.set_ylabel('Lights Off', color='b')
-		self.ax2.set_ylim(0,1)
+		
+		self.ax2.plot(range(10), [np.NaN]*10, 'b')
+		self.ax2.set_ylabel('axis 2', color='b')
+		self.ax2.set_ylim(-1,1)
+		self.ax3.set_ylim(-1,1)
+		self.ax4.set_ylim(-1,1)
 
 
-	def update_figure(self, lights_on, lights_of):
+
+	def update_figure(self, graph_type, array1, array2, array3=None ):
 		"""
 		Update the line chart w/ data from the caller
 		"""
 
 		# need to clear axes to place new data
-		self.axes.cla()
+		self.ax3.cla()
 		self.ax2.cla()
+		self.ax4.cla()
+		self.axes.cla()
 
-		# unfortunately this means replacing limits and labels w/ data
-		self.axes.set_ylim(0,1)
-		self.axes.plot(range(10),lights_on,'r')
-		self.axes.set_ylabel('Lights ON ', color='r')
-		self.axes.set_title('Usage of Lights ')
+		self.ax2 = self.axes.twinx()
+		self.ax3 = self.axes.twinx()
+
+		if graph_type == GraphState.LIGHTS:
+                        
+                        self.axes.set_ylabel('Lights ON ', color='r')
+                        self.axes.set_title('Usage of Lights ')
+	
+                        self.ax2.set_ylabel('Lights Off', color='b')
+                        self.ax2.set_ylim(-1,1)
+                        self.ax2.plot(range(10), array2, 'b')
+
+                        self.ax3.set_ylim(-1,1)
+                        self.ax3.plot(range(10),array1,'r')
+                        
+                if graph_type == GraphState.OVERHEAD:
+
+        		self.ax4 = self.axes.twinx()
+                        
+                        self.axes.set_ylabel('overhead(bytes) ', color='r')
+                        self.axes.set_title('Size of Overhead for all protocols ')
+                        self.axes.set_ylim(1,50)
+
+
+                        self.axes.set_ylabel('MQTT', color='b')
+                        self.axes.set_ylim(1,50)
+                        self.ax3.plot(range(10),array1,'r')
 		
-		# same goes for humidity data
-		self.ax2.set_ylim(0,1)
-		self.ax2.plot(range(10), lights_of, 'b')
-		self.ax2.set_ylabel('Lights Off', color='b')
-		self.draw()
+                        self.ax2.set_ylabel('Websockets', color='b')
+                        self.ax2.set_ylim(1,50)
+                        self.ax2.plot(range(10), array2, 'b')
+
+                        self.axes.set_ylabel('CoAP', color='b')
+                        self.ax3.set_ylim(1,50)
+                        self.ax4.set_ylim(1,50)
+                        self.ax4.plot(range(10), array3, 'g')
+                        
+                if graph_type == GraphState.LATENCY:
+        		self.ax4 = self.axes.twinx()
+                
+                        self.axes.set_ylabel('LATENCY ', color='r')
+                        self.axes.set_title('Latency for all protocols ')
+
+
+                        # unfortunately this means replacing limits and labels w/ data
+                        self.axes.set_ylabel('MQTT', color='b')
+                        self.axes.set_ylim(0,10)
+                        self.ax3.plot(range(10),array1,'r')
+		
+                        # same goes for lights_of data
+                        self.ax2.set_ylabel('Websockets', color='b')
+                        self.ax2.set_ylim(0,10)
+                        self.ax2.plot(range(10), array2, 'b')
+
+                        #
+                        self.axes.set_ylabel('CoAP', color='b')
+                        self.axes.set_ylim(0,10)
+                        self.ax4.plot(range(10), array3, 'g')
+
+                self.draw()
 
 
 class StatsWindow(QtGui.QMainWindow):
@@ -104,16 +163,23 @@ class StatsWindow(QtGui.QMainWindow):
         initialize this window
         """
 	super(StatsWindow, self).__init__(parent)
-        self.red = 0
-        self.blue = 0
-        self.green = 0
+
         self.parent = parent
-        self.lights_on = 0
-        self.lights_of = 0
+
+        self.red   = 0
+        self.blue  = 0
+        self.green = 0
+        
+        self.lights_on  = 0
+        self.lights_of  = 0
+        self.graph_type = None
+        
         # measurement data vars
-	self.lights_ondata = [0]*10
-	self.lights_ofdata  = [0]*10
+	self.array1    = [0]*10
+	self.array2    = [0]*10
+	self.array3    = [0]*10
 	self.plotCount = 0
+
         self.initUI()
 
 
@@ -127,13 +193,22 @@ class StatsWindow(QtGui.QMainWindow):
 
         # init timer
 	self.timer = QTimer()
-	self.timer.timeout.connect(self.printStats)
 	self.timer.stop()
 	
 	# button to set automatic data capture
-	self.autostart = QtGui.QPushButton('Start', self)
-	self.autostart.setToolTip('Click to start auto measurement')
-	self.autostart.clicked.connect(self.timerStart)
+	self.lights = QtGui.QPushButton('Lights', self)
+	self.lights.setToolTip('Click to get status of lights in rooms')
+	self.lights.clicked.connect(self.ledTimerStart)
+
+	# button for overhead
+        self.overhead = QtGui.QPushButton('Overhead', self)
+	self.overhead.setToolTip('Click to find the overhead for protocols')
+	self.overhead.clicked.connect(self.overheadTimerStart)
+
+	# button for latency
+        self.latency = QtGui.QPushButton('Latency', self)
+	self.latency.setToolTip('Click to find the latency for protocols')
+	self.latency.clicked.connect(self.latencyTimerStart)
 
 	# Create user-name label
         self.stats=QtGui.QLabel(self)
@@ -150,13 +225,15 @@ class StatsWindow(QtGui.QMainWindow):
 	
 
         wid = QtGui.QWidget(self)
-        hbox = QtGui.QHBoxLayout()
-        hbox.addWidget(self.autostart)
-        hbox.addWidget(self.goback)
+        btn_box = QtGui.QHBoxLayout()
+        btn_box.addWidget(self.lights)
+        btn_box.addWidget(self.overhead)
+        btn_box.addWidget(self.latency)
+        btn_box.addWidget(self.goback)
 	vbox = QtGui.QVBoxLayout()
         vbox.addWidget(self.stats)
         vbox.addWidget(self.canvas)
-        vbox.addLayout(hbox)
+        vbox.addLayout(btn_box)
 	wid.setLayout(vbox)
         self.setCentralWidget(wid)
 
@@ -166,42 +243,84 @@ class StatsWindow(QtGui.QMainWindow):
 
 
 
-    def printStats(self):
+    def ledStats(self):
+
+        #vars to get the RGB values from parent
         self.red = self.parent.red
         self.green = self.parent.green
         self.blue = self.parent.blue
-        print self.red
-        print self.green
-        print len(self.lights_ondata)
+        
         if self.red !=0 or self.blue != 0  or self.green !=0:
-            self.lights_on = 1
-            self.lights_of = 0
+                self.lights_on = 1
+                self.lights_of = 0
             
         else:
-            self.lights_of = 1
-            self.lights_on = 0
+                self.lights_of = 1
+                self.lights_on = 0
 
 	# When count < len(graph), just populate graph
 	if self.plotCount < 10:
-                self.lights_ondata[self.plotCount] = self.lights_on
-		self.lights_ofdata[self.plotCount] = self.lights_of
+                self.array1[self.plotCount] = self.lights_on
+		self.array2[self.plotCount] = self.lights_of
 		self.plotCount += 1	
 			
 	# then keep rolling the chart over
 	else:
-                self.lights_ondata[0] = self.lights_on
-		self.lights_ondata = np.roll(self.lights_ondata, len(self.lights_ondata)-1)		
-		self.lights_ofdata[0] = self.lights_of
-		self.lights_ofdata = np.roll(self.lights_ofdata, len(self.lights_ofdata)-1)
+                self.array1[0] = self.lights_on
+		self.array1 = np.roll(self.array1, len(self.array1)-1)		
+		self.array2[0] = self.lights_of
+		self.array2 = np.roll(self.array2, len(self.array2)-1)
 
-	self.canvas.update_figure(self.lights_ondata, self.lights_ofdata)
+	self.canvas.update_figure(GraphState.LIGHTS, self.array1, self.array2)
 
-    def timerStart(self):
-		"""
-		Start the timer
-		"""	
-		self.timer.start(1000)
-		return
+
+    def latencyStats(self):
+        print("Not implemented! Latency")
+	#self.canvas.update_figure(GraphState.LATENCY, self.ws_latency, self.coap_latency, self.mqtt_latency)
+        return
+
+
+
+    def overheadStats(self):
+        print("Not implemented! Overhead")
+	#self.canvas.update_figure(GraphState.OVERHEAD, self.ws_ovh, self.coap_ovh, self.mqtt_ovh)
+        return
+
+
+
+    def overheadTimerStart(self):
+	"""
+	Start the timer with timeout set to latency calculation
+	"""	
+	self.timer.stop()
+        self.timer =  QTimer(self)
+
+       	self.timer.timeout.connect(self.overheadStats)
+	self.timer.start(1000)
+        return
+
+
+    def latencyTimerStart(self):
+	"""
+	Start the timer with timeout set to latency calculation
+	"""	
+	self.timer.stop()
+	self.timer =  QTimer(self)
+       	self.timer.timeout.connect(self.latencyStats)
+	self.timer.start(1000)
+        return
+
+
+    def ledTimerStart(self):
+	"""
+	Start the timer with timeout set to grab light setting
+	"""	
+	self.timer.stop()
+	self.timer =  QTimer(self)
+       	self.timer.timeout.connect(self.ledStats)
+	self.timer.start(1000)
+        return
+
 
 
     def goBack(self):
