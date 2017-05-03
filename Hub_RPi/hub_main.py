@@ -3,14 +3,13 @@
 
 import sys, json, numpy
 import opc
-from tornado.ioloop import IOLoop, PeriodicCallback
-from tornado import gen
-from tornado.websocket import websocket_connect
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import QTimer
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from boto3.session import Session
-from random import randint
+
+from time import time
+
 # all windows
 from helpers import WindowState
 from lockedwindow import LockedWindow
@@ -46,50 +45,30 @@ class Hub(QtGui.QMainWindow):
         self.statsscreen = None
 
 	# connection variables
-        self.url = "ws://52.34.209.113:8080/websocket"
-        self.ws_timeout  = 500
-        self.gui_timeout = 250 
         self.first_time  = True
-        self.drop_count  = 0
-        self.toggle      = 0
-        self.red = 0
-        self.green = 0
-        self.blue = 0
-
-	# Tornado Variables
-        self.ioloop = IOLoop.instance()
-        self.ws = None
+        self.red         = 0
+        self.green       = 0
+        self.blue        = 0
 
 	# LED vars
-	self.num_pixels = 60
-	self.led_addr   = 'localhost:7890'
-	self.led_client = opc.Client(self.led_addr)
+	self.num_pixels      = 60
+	self.led_addr        = 'localhost:7890'
+	self.led_client      = opc.Client(self.led_addr)
 	self.fast_transition = True
 
 	# initalize the GUI
         self.initUI()
 
-        if self.use_websockets:
-	    # Connect to the Websockets server
-            self.connect()
-	    
-	    # setup the Websocket IO Loop
-	    self.my_p_callback = PeriodicCallback(self.keep_alive, self.ws_timeout, io_loop=self.ioloop)
-	    self.my_p_callback.start()
-            self.ioloop.start()
+        self.rootCAPath="/home/pi/Desktop/root-CA.crt"
+        self.privateKeyPath="/home/pi/Desktop/Access01.private.key"
+        self.certificatePath="/home/pi/Desktop/Access01.cert.pem"
+        self.host="a1qhmcyp5eh8yq.iot.us-west-2.amazonaws.com"
+        self.setupAWS()
 
-        else:
-            self.rootCAPath="/home/pi/Desktop/root-CA.crt"
-            self.privateKeyPath="/home/pi/Desktop/Access01.private.key"
-            self.certificatePath="/home/pi/Desktop/Access01.cert.pem"
-            self.host="a1qhmcyp5eh8yq.iot.us-west-2.amazonaws.com"
-            self.setupAWS()
-  
-            self.WORK_PERIOD = 2000 
-            self.myTimer = QTimer()
-            self.myTimer.timeout.connect(self.processSQS)
-            self.myTimer.start(self.WORK_PERIOD)
-
+        self.WORK_PERIOD = 2000 
+        self.myTimer = QTimer()
+        self.myTimer.timeout.connect(self.processSQS)
+        self.myTimer.start(self.WORK_PERIOD)
 
 	if self.led_client.can_connect():
 		print('Connected to: '+self.led_addr)
@@ -219,16 +198,25 @@ class Hub(QtGui.QMainWindow):
 			    self.window_state = WindowState.MAIN_WINDOW 
 			    self.set_window_to_state()
 
+
+		elif json_body['type'] == 'overhead':
+			if self.window_state == WindowState.STATS_WINDOW:
+				self.ws_latency   = json_body['ws_lat']
+				self.mqtt_latency = json_body['mqtt_lat']
+				self.coap_latency = json_body['coap_lat']
+
+        			
+				if self.statsscreen != None:
+					self.statsscreen.latencyStats(self.ws_latency, self.coap_latency, self.mqtt_latency)
+
+
 		elif json_body['type'] == 'led':
 			if self.window_state != WindowState.LOCK_WINDOW:
-				r_val = json_body['red']
-				b_val = json_body['blue']
-				g_val = json_body['green']
-				self.red = r_val
-				self.blue = b_val
-				self.green = g_val
+				self.red   = json_body['red']
+				self.blue  = json_body['blue']
+				self.green = json_body['green']
 
-				self.setLEDs(r_val, g_val, b_val)
+				self.setLEDs(self.red, self.green, self.blue)
 
             # Now delete the ack'ed message
             for item in acked_messages:
@@ -364,99 +352,119 @@ class Hub(QtGui.QMainWindow):
 			print("Not connected!")
 	return
 
-    @gen.coroutine
-    def connect(self):
-        """
-        Connect to the websockets server
-        on our ec2 server
-        """
-
-        #print "trying to connect"
-
-        try:
-            self.ws = yield websocket_connect(self.url)
-        except Exception, e:
-            print "connection error"
-        else:
-            #print "connected"
-            pass
-
-
-    def sendAndRead(self):
-        """ 
-        query for login and arm/disarm status and read responses
-        """
-
-        #print("Sending messages!")
-        self.toggle = 1 - self.toggle
-
-        if self.toggle == 1:
-		self.ws.write_message("login_status")
-		self.readInput()
-        else:
-		self.ws.write_message("arm_status")
-		self.readInput()
 
 
 
-    @gen.coroutine
-    def readInput(self):
-        """
-        read a message back from websockets and set update
-        """
- 
-        try:
-            msg = yield self.ws.read_message()
-        except:
-            self.drop_count += 1
-            if self.drop_count >= 2:
-		    self.statusBar().showMessage('Connection Error!')
-                    self.user_data.setText("Disconnected!")
-            return
-
-        self.drop_count = 0
-
-        # data is sent 
-        self.statusBar().clearMessage()
-        indata = msg.split(":")
-        if indata[0] == "name" :
-            self.user_data.setText("Welcome, "+indata[1])
-        elif indata[0] == "state" :
-            pass
-        #print ("Received Data: '"+indata[1]+"'")
-
-
-        
-    def keep_alive(self):
-        """ 
-        heartbeat function of program- send commands
-        and receive data to display
-        """
-        
-        # reconnect if connection has been lost
-        if self.ws is None:
-            self.connect()
-        else:
-            if self.first_time:
-                self.first_time = False
-            else:
-                try:
-                    self.ioloop.start()
-                except:
-                    self.connect()
-            
-            self.sendAndRead()
-            
-            self.ioloop.stop()
-            self.my_p_callback.stop()
-            QTimer.singleShot(self.gui_timeout, self.poll_websockets)
-            
-
-    def poll_websockets(self):
-        """ Take control from GUI for websockets"""
-
-        self.my_p_callback.start()
-        self.ioloop.start()
+#    def testCoAP(self):
+#        endpoint = resource.Endpoint(None)
+#        protocol = coap.Coap(endpoint)
+#        client   = Agent(protocol)
+#        reactor.listenUDP(61616, protocol)
+#        reactor.run()
+#
+#    def testMQTT(self):
+#        curr_time = time()
+#        publish.single("AccessControl/MQTT_test", str(now), hostname="test.mosquitto.org") 
+#
+#    def testWebsockets(self):
+#        curr_time = time()
+#        ws = websocket.create_connection("ws://52.34.209.113:8000")
+#	ws.send(str(curr_time))
+#
+#
+#    @gen.coroutine
+#    def connect(self):
+#        """
+#        Connect to the websockets server
+#        on our ec2 server
+#        """
+#
+#        #print "trying to connect"
+#
+#        try:
+#            self.ws = yield websocket_connect(self.url)
+#        except Exception, e:
+#            print "connection error"
+#        else:
+#            #print "connected"
+#            pass
+#
+#
+#    def sendAndRead(self):
+#        """ 
+#        query for login and arm/disarm status and read responses
+#        """
+#
+#        #print("Sending messages!")
+#        self.toggle = 1 - self.toggle
+#
+#        if self.toggle == 1:
+#		self.ws.write_message("login_status")
+#		self.readInput()
+#        else:
+#		self.ws.write_message("arm_status")
+#		self.readInput()
+#
+#
+#
+#    @gen.coroutine
+#    def readInput(self):
+#        """
+#        read a message back from websockets and set update
+#        """
+# 
+#        try:
+#            msg = yield self.ws.read_message()
+#        except:
+#            self.drop_count += 1
+#            if self.drop_count >= 2:
+#		    self.statusBar().showMessage('Connection Error!')
+#                    self.user_data.setText("Disconnected!")
+#            return
+#
+#        self.drop_count = 0
+#
+#        # data is sent 
+#        self.statusBar().clearMessage()
+#        indata = msg.split(":")
+#        if indata[0] == "name" :
+#            self.user_data.setText("Welcome, "+indata[1])
+#        elif indata[0] == "state" :
+#            pass
+#        #print ("Received Data: '"+indata[1]+"'")
+#
+#
+#        
+#    def keep_alive(self):
+#        """ 
+#        heartbeat function of program- send commands
+#        and receive data to display
+#        """
+#        
+#        # reconnect if connection has been lost
+#        if self.ws is None:
+#            self.connect()
+#        else:
+#            if self.first_time:
+#                self.first_time = False
+#            else:
+#                try:
+#                    self.ioloop.start()
+#                except:
+#                    self.connect()
+#            
+#            self.sendAndRead()
+#            
+#            self.ioloop.stop()
+#            self.my_p_callback.stop()
+#            QTimer.singleShot(self.gui_timeout, self.poll_websockets)
+#            
+#
+#    def poll_websockets(self):
+#        """ Take control from GUI for websockets"""
+#
+#        self.my_p_callback.start()
+#        self.ioloop.start()
 
 
 if __name__ == "__main__":
