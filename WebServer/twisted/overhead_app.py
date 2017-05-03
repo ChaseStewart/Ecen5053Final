@@ -13,8 +13,13 @@ import sys, json
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 
 # globals 
-
 BROKER = "tcp:test.mosquitto.org:1883"
+mqtt_latency = None
+mqtt_size    = None
+coap_latency = None
+coap_size    = None
+ws_latency   = None
+ws_size      = None
 
 
 rootCA      = "root-CA.crt"
@@ -24,21 +29,81 @@ myhost        = "alqhmcyp5eh8yq.iot.us-west-2.amazonaws.com"
 myhost="a1qhmcyp5eh8yq.iot.us-west-2.amazonaws.com" 
 
 
-def publishJSON(jsonData):
-	AWSClient = AWSIoTMQTTClient("basicPubSub")
-	AWSClient.configureEndpoint(myhost, 8883)
-	AWSClient.configureCredentials(rootCA, privatePath, certPath)
 
-	AWSClient.configureAutoReconnectBackoffTime(1,32,20)
-	AWSClient.configureOfflinePublishQueueing(-1)
-	AWSClient.configureDrainingFrequency(2)
-	AWSClient.configureConnectDisconnectTimeout(10)
-	AWSClient.configureMQTTOperationTimeout(10)
-	AWSClient.connect()
+class PerfPublisher():
+	def __init__(self):
+		self.mqtt_latency = None 
+		self.mqtt_size    = None
+		self.has_mqtt     = False
+
+		self.coap_latency = None
+		self.coap_size    = None
+		self.has_coap     = False
+
+		self.ws_latency   = None
+		self.ws_size      = None
+		self.has_ws       = False
+
+	def clearVals(self):
+		self.mqtt_latency = None
+		self.mqtt_size    = None
+		self.has_mqtt     = False
 		
-	strData= json.dumps(jsonData)
-	AWSClient.publish("AccessControl/performance", str(strData), 1)
-	return
+		self.coap_latency = None
+		self.coap_size    = None
+		self.has_coap     = False
+		
+		self.ws_latency   = None
+		self.ws_size      = None
+		self.has_ws       = False
+
+	def setVals(self, protocol, latency, size):
+		if protocol == "MQTT" and self.mqtt_latency == None and self.mqtt_size == None:
+			self.mqtt_latency = latency
+			self.mqtt_size    = size
+			self.has_mqtt     = True
+
+		elif protocol == "CoAP" and self.coap_latency == None and self.coap_size == None:
+			self.coap_latency = latency
+			self.coap_size    = size
+			self.has_coap     = True
+
+		elif protocol == "WS" and self.ws_latency == None and self.ws_size == None:
+			self.ws_latency = latency
+			self.ws_size    = size
+			self.has_ws     = True	
+		
+		print ("WS: %s, CoAP: %s, MQTT: %s" % (self.has_ws, self.has_coap, self.has_mqtt))
+		if self.has_ws and self.has_coap and self.has_mqtt:
+			self.publishJSON()	
+
+
+	def publishJSON(self):
+		AWSClient = AWSIoTMQTTClient("basicPubSub")
+		AWSClient.configureEndpoint(myhost, 8883)
+		AWSClient.configureCredentials(rootCA, privatePath, certPath)
+
+		AWSClient.configureAutoReconnectBackoffTime(1,32,20)
+		AWSClient.configureOfflinePublishQueueing(-1)
+		AWSClient.configureDrainingFrequency(2)
+		AWSClient.configureConnectDisconnectTimeout(10)
+		AWSClient.configureMQTTOperationTimeout(10)
+		AWSClient.connect()
+
+		jsonData = {}	
+		jsonData['type'] = 'overhead'
+		jsonData['mqtt_lat'] = self.mqtt_latency
+		jsonData['mqtt_ovh'] = self.mqtt_size
+		jsonData['ws_lat']   = self.ws_latency
+		jsonData['ws_ovh']   = self.ws_size
+		jsonData['coap_lat'] = self.coap_latency
+		jsonData['coap_ovh'] = self.coap_size
+
+		strData= json.dumps(jsonData)
+		print("Published data!")
+		#print strData
+		AWSClient.publish("AccessControl/performance", str(strData), 1)
+		self.clearVals()
 
 
 # Fake protos
@@ -80,21 +145,29 @@ class WSProto(WebSocketServerProtocol):
 		print("packet_len is "+str(len(payload)))
 		print ("Delta time is "+str(delta))
 
-		jsondata = {}
-		jsondata['type'] = 'overhead'
-		jsondata['proto'] = 'WebSocket'
-		jsondata['byte'] = len(payload)
-		jsondata['time'] = delta
-		publishJSON(jsondata)
+		ws_latency   = delta
+		ws_size      = len(payload)
+		print("Took websockets measurement")
+		global publisher
+		publisher.setVals("WS", ws_latency, ws_size)
+
 
 class CoAPProto(resource.CoAPResource):
 	"""
 	CoAP Protocol
 	"""
+	#isLeaf = True
+
 	def __init__(self, start=0):
 		resource.CoAPResource.__init__(self)
 		self.visible=True
+		self.addParam(resource.LinkParam("title", "delta resource"))
 		print("CoAP connected to localhost:5683\n")
+
+	def render_GET(self, request):
+		payload = "Use GET instead!"
+		response = coap.Message(code=coap.CONTENT, payload = payload)
+		return defer.succeed(response)
 
 	def render_PUT(self, request):
 		now = time()
@@ -102,14 +175,13 @@ class CoAPProto(resource.CoAPResource):
 		print request.payload
 		print("packet_len is "+str(len(request.payload)))
 		print ("Delta time is "+str(delta))
-		jsondata = {}
-		jsondata['type'] = 'overhead'
-		jsondata['proto'] = 'CoAP'
-		jsondata['byte'] = len(request.payload)
-		jsondata['time'] = delta
-		publishJSON(jsondata)
-		response = coap.Message(code=coap.CHANGED, payload =str(delta) )
-		return defer.succeed(response)
+		coap_latency   = delta
+		coap_size      = len(request.payload)
+		global publisher
+		print("Took CoAP measurement")
+		publisher.setVals("CoAP", coap_latency, coap_size)
+		response = coap.Message(code=coap.CHANGED, payload=str(delta))
+		return deferred 
 
 
 
@@ -170,12 +242,12 @@ class MQTTProto(ClientService):
 		print("packet_len is "+str(len(payload)))
 		print ("Delta time is "+str(delta))
 		
-		jsondata = {}
-		jsondata['type'] = 'overhead'
-		jsondata['proto'] = 'MQTT'
-		jsondata['byte'] = len(payload)
-		jsondata['time'] = delta
-		publishJSON(jsondata)
+		mqtt_latency   = delta
+		mqtt_size      = len(payload)
+		print("Took MQTT measurement")
+
+		global publisher
+		publisher.setVals("MQTT", mqtt_latency, mqtt_size)
 
 	def onDisconnection(self, reason):
 		'''
@@ -186,7 +258,12 @@ class MQTTProto(ClientService):
 		self.whenConnected().addCallback(self.connectToBroker)
 
 	
+def printResult(result):
+	print(result)
 
+def printError(failure):
+	import sys
+	sys.stderr.write(str(failure))
 
 def main():
 	"""
@@ -194,7 +271,7 @@ def main():
 	"""
 
 	# WS listener 
-	ws_factory = WebSocketServerFactory(u"ws://localhost:8000")
+	ws_factory = WebSocketServerFactory(u"ws://52.34.209.113:8000")
 	ws_factory.protocol = WSProto
 	reactor.listenTCP(8000, ws_factory)
 
@@ -204,7 +281,7 @@ def main():
 	mqtt_serv     = MQTTProto(mqtt_endpoint, mqtt_factory)
 	mqtt_serv.startService()
 
-	# TODO CoAP listener
+	# CoAP listener
 	coap_root = resource.CoAPResource()
 	coap_ovh  = CoAPProto()
 	coap_root.putChild('test',coap_ovh)
@@ -243,6 +320,10 @@ if __name__ == "__main__":
 
 	"""
 	
+	# create publisher
+	publisher = PerfPublisher()
 	print infostr
+
+	# run main function
 	main()
 
