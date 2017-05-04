@@ -4,14 +4,19 @@ import time
 NUM_PIXELS = 60
 ADDRESS = 'localhost:7890'
 
-### HELPERS ###
 
 def rotate(l,n):
-	# thanks to stackoverflow.com/questions/9457832/python-list-rotation
+	"""
+	Rotate an array
+	This function thanks to stackoverflow.com/questions/9457832/python-list-rotation
+	"""
 	return l[n:] + l[:n]
 
 
-### START  ###
+
+"""
+START the program
+"""
 
 client = opc.Client(ADDRESS)
 
@@ -22,7 +27,6 @@ else:
 	time.sleep(3)
 
 three_colors = [(255,0,0),(0,255,0),(0,0,255)]
-
 intermediate = []
 
 for j in range(NUM_PIXELS):
@@ -33,6 +37,8 @@ my_pixels.append(intermediate)
 my_pixels.append(rotate(intermediate, 1))
 my_pixels.append(rotate(intermediate, 2))
 i = 0
+
+# rotate between the three settings within my_pixels
 while True:
 	if client.put_pixels(my_pixels[i], channel=0):
 		pass

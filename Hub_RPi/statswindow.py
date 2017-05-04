@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*
 
-import sys, json, numpy
-from PyQt4 import QtGui, QtCore
-from PyQt4.QtCore import QTimer
-from helpers import WindowState
-from helpers import GraphState
+import sys, json
 from time import time
 import numpy as np
+from PyQt4 import QtGui, QtCore
+from PyQt4.QtCore import QTimer
+
+from helpers import GraphState, WindowState
 
 # MatPlotLib setup
 import matplotlib
@@ -15,9 +15,11 @@ from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 # protocol testing libraries
+from coapthon.client.helperclient import HelperClient
 import paho.mqtt.publish as publish
 import websocket
-from coapthon.client.helperclient import HelperClient
+
+
 
 class graphCanvas(FigureCanvas):
 	"""
@@ -52,39 +54,44 @@ class DynamicGraph(graphCanvas):
 	This class actually holds the graph 
 	"""
 
+
 	def __init__(self, *args, **kwargs):
 		"""
 		Does a superclass init to graphCanvas
 		"""
 		graphCanvas.__init__(self, *args, **kwargs)
 
+
+
 	def compute_initial_figure(self):
 		"""
 		renders the plot before any data has been taken
 		"""
 		
-		# set up red plot
+		# create 4 axes
 		self.ax2 = self.axes.twinx()
 		self.ax3 = self.axes.twinx()
 		self.ax4 = self.axes.twinx()
-		
-		self.ax3.plot(range(10), [np.NaN]*10,'r', label='dummy1')
-		self.axes.set_ylabel('axis 1', color='r')
+	
+		# setup axis title and left axis	
+		self.axes.set_ylabel('axis 1', color='r', fontsize=16)
 		self.axes.set_ylim(-1,2)
-
-		self.axes.set_xlabel('Sample')
-		self.axes.set_title('Choose a stat to graph')
+		self.axes.set_xlim(0,10)
+		self.axes.set_xlabel('Sample', fontsize=16)
+		self.axes.set_title('Choose a stat to graph', fontsize=20)
 		
-		# set up blue plot
-		
+		# setup range 1
 		self.ax2.plot(range(10), [np.NaN]*10, 'b', label='dummy2')
-		self.ax2.set_ylabel('axis 2', color='b')
+		self.ax2.set_ylabel('axis 2', color='b', fontsize=16)
 		self.ax2.set_ylim(-1,2)
                 self.ax2.get_yaxis().set_ticks([])
 
+		# setup range 2
+		self.ax3.plot(range(10), [np.NaN]*10,'r', label='dummy1')
 		self.ax3.set_ylim(-1,2)
                 self.ax3.get_yaxis().set_ticks([])
 
+		# hide range 3
 		self.ax4.set_ylim(-1,2)
                 self.ax4.get_yaxis().set_ticks([])
 
@@ -103,11 +110,12 @@ class DynamicGraph(graphCanvas):
 
 		if graph_type == GraphState.LIGHTS:
                         
-                        self.axes.set_ylabel('Lights ON ', color='r')
-                        self.axes.set_title('Usage of Lights ')
+                        self.axes.set_ylabel('Lights ON ', color='r', fontsize=16)
+                        self.axes.set_title('Usage of Lights ', fontsize=20)
                         self.axes.set_ylim(-1,2)
+			self.axes.set_xlim(0,10)
 
-                        self.ax2.set_ylabel('Lights Off', color='b')
+                        self.ax2.set_ylabel('Lights Off', color='b', fontsize=16)
                         self.ax2.plot(range(10), led2array, 'b', label="Lights Off")
                         self.ax2.set_ylim(-1,2)
                         self.ax2.get_yaxis().set_ticks([])
@@ -123,9 +131,10 @@ class DynamicGraph(graphCanvas):
 
                 if graph_type == GraphState.RGB:
                         
-                        self.axes.set_ylabel('Value (0-255) ', color='k')
-                        self.axes.set_title('Color on LEDs ')
+                        self.axes.set_ylabel('Value (0-255) ', color='k', fontsize=16)
+                        self.axes.set_title('Color on LEDs ', fontsize=20)
                         self.axes.set_ylim(0,256)
+			self.axes.set_xlim(0,10)
 
                         self.ax2.plot(range(10), led2array, 'b', label="Blue")
                         self.ax2.set_ylim(0,256)
@@ -143,9 +152,10 @@ class DynamicGraph(graphCanvas):
                         
                 if graph_type == GraphState.LATENCY:
                         
-                        self.axes.set_title('Latency for all protocols ')
-                        self.axes.set_ylabel('Latency', color='k')
+                        self.axes.set_title('Latency for all protocols ', fontsize=20)
+                        self.axes.set_ylabel('Latency', color='k', fontsize=16)
 			self.axes.set_ylim(0,1)
+			self.axes.set_xlim(0,10)
                         
                         self.ax2.plot(range(10), led2array, 'b', label="CoAP")
 			self.ax2.set_ylim(0,1)
@@ -239,7 +249,12 @@ class StatsWindow(QtGui.QMainWindow):
         self.stats.setFont(self.font)
         self.stats.setText("System Stats")
         
-        # put buttons + status in a vbox
+	# Create legend label
+        self.legendLabel=QtGui.QLabel(self)
+        self.legendLabel.setFont(self.font)
+        self.legendLabel.setText("")
+        
+	# put buttons + status in a vbox
         self.goback=QtGui.QPushButton("Back",self)
         self.goback.clicked.connect(self.goBack)
 
@@ -256,6 +271,7 @@ class StatsWindow(QtGui.QMainWindow):
 	vbox = QtGui.QVBoxLayout()
         vbox.addWidget(self.stats)
         vbox.addWidget(self.canvas)
+        vbox.addWidget(self.legendLabel)
         vbox.addLayout(btn_box)
 	wid.setLayout(vbox)
         self.setCentralWidget(wid)
@@ -294,6 +310,7 @@ class StatsWindow(QtGui.QMainWindow):
 		self.led2array[0] = self.lights_of
 		self.led2array = np.roll(self.led2array, len(self.led2array)-1)
 
+        self.legendLabel.setText("Red- Lights ON, Blue- Lights OFF")
 	self.canvas.update_figure(GraphState.LIGHTS, self.led1array, self.led2array)
 
 
@@ -317,6 +334,7 @@ class StatsWindow(QtGui.QMainWindow):
                 self.mqttArray[0] = mqtt
 		self.mqttArray = np.roll(self.mqttArray, len(self.mqttArray)-1)
         
+        self.legendLabel.setText("Green- Websockets, Blue- CoAP, Red- MQTT")
 	self.canvas.update_figure(GraphState.LATENCY, self.wsArray, self.coapArray, self.mqttArray)
         return
 
@@ -345,6 +363,7 @@ class StatsWindow(QtGui.QMainWindow):
                 self.greenArray[0] = self.green
 		self.greenArray = np.roll(self.greenArray, len(self.greenArray)-1)		
 
+        self.legendLabel.setText("Red- Red, Blue- Blue, Green- Green")
 	self.canvas.update_figure(GraphState.RGB, self.redArray, self.blueArray, self.greenArray)
         return
 
