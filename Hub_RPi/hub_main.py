@@ -113,6 +113,8 @@ class Hub(QtGui.QMainWindow):
         Select a window to display using enums from Helpers
         """
 
+
+	""" FIRST PERFORM TEARDOWN """
         print("Changing state to %d" % self.window_state)
 
         if self.lockscreen != None and self.window_state != WindowState.LOCK_WINDOW:
@@ -120,7 +122,7 @@ class Hub(QtGui.QMainWindow):
             self.lockscreen.teardown()
             self.lockscreen = None
 
-        if self.window_state != WindowState.MAIN_WINDOW:
+        if self.window_state != WindowState.MAIN_WINDOW and self.window_state != WindowState.VOICE_WINDOW:
             if self.start_armed:
                 self.start_armed = False
             else:
@@ -137,6 +139,10 @@ class Hub(QtGui.QMainWindow):
             self.statsscreen.teardown()
             self.statsscreen = None
 
+
+
+	""" NOW SET DATA FOR CURRENT WINDOW """
+
         if self.window_state == WindowState.LOCK_WINDOW and self.lockscreen == None:
             print("Showing Lockscreen")
             self.lockscreen = LockedWindow(self)
@@ -145,6 +151,17 @@ class Hub(QtGui.QMainWindow):
         if self.window_state == WindowState.MAIN_WINDOW:
             print("Showing Main")
             self.show()
+            self.LED_btn.show()
+            self.Voice_btn.show()
+            self.Stats_btn.show()
+            self.Logout_btn.show()
+
+        if self.window_state == WindowState.VOICE_WINDOW:
+            print("Hiding Buttons")
+            self.LED_btn.hide()
+            self.Voice_btn.hide()
+            self.Stats_btn.hide()
+            self.Logout_btn.hide()
 
         if self.window_state == WindowState.LED_WINDOW and self.ledscreen == None:
             print("Showing LEDscreen")
@@ -325,6 +342,10 @@ class Hub(QtGui.QMainWindow):
         self.voice_status.setText("Voice Mode ON")
         self.voice_status.repaint()
         self.hub_voice = Hub_voice(self)
+        
+
+	self.window_state = WindowState.VOICE_WINDOW
+        self.set_window_to_state()
 
         # set timer for first time'   
         QtCore.QTimer.singleShot(50, self.listenAgain) 
@@ -340,6 +361,8 @@ class Hub(QtGui.QMainWindow):
             QtCore.QTimer.singleShot(400, self.listenAgain) 
 
         else:       
+	    self.window_state = WindowState.MAIN_WINDOW
+            self.set_window_to_state()
             self.voice_status.setText("Voice Mode OFF")
 
  

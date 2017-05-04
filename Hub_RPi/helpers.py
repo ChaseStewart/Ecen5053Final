@@ -9,6 +9,7 @@ class WindowState(object):
     MAIN_WINDOW  = 1
     LED_WINDOW   = 2
     STATS_WINDOW = 3
+    VOICE_WINDOW = 4
 
 class GraphState(object):
     """
