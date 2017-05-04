@@ -8,14 +8,14 @@ from PyQt4.QtCore import QTimer
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from boto3.session import Session
 
-from time import time
+from time import time, sleep
 
 # all windows
-from helpers import WindowState
+from helpers import WindowState, VoiceState
 from lockedwindow import LockedWindow
 from ledwindow import LEDWindow
 from statswindow import StatsWindow
-#from hub_voice import Hub_voice
+from fork_hub_voice import Hub_voice
 
 
 class Hub(QtGui.QMainWindow):
@@ -43,6 +43,7 @@ class Hub(QtGui.QMainWindow):
         self.lockscreen  = None
         self.ledscreen   = None
         self.statsscreen = None
+        self.hub_voice   = None
 
 	# connection variables
         self.first_time  = True
@@ -112,6 +113,8 @@ class Hub(QtGui.QMainWindow):
         Select a window to display using enums from Helpers
         """
 
+
+	""" FIRST PERFORM TEARDOWN """
         print("Changing state to %d" % self.window_state)
 
         if self.lockscreen != None and self.window_state != WindowState.LOCK_WINDOW:
@@ -119,7 +122,7 @@ class Hub(QtGui.QMainWindow):
             self.lockscreen.teardown()
             self.lockscreen = None
 
-        if self.window_state != WindowState.MAIN_WINDOW:
+        if self.window_state != WindowState.MAIN_WINDOW and self.window_state != WindowState.VOICE_WINDOW:
             if self.start_armed:
                 self.start_armed = False
             else:
@@ -136,6 +139,10 @@ class Hub(QtGui.QMainWindow):
             self.statsscreen.teardown()
             self.statsscreen = None
 
+
+
+	""" NOW SET DATA FOR CURRENT WINDOW """
+
         if self.window_state == WindowState.LOCK_WINDOW and self.lockscreen == None:
             print("Showing Lockscreen")
             self.lockscreen = LockedWindow(self)
@@ -144,6 +151,17 @@ class Hub(QtGui.QMainWindow):
         if self.window_state == WindowState.MAIN_WINDOW:
             print("Showing Main")
             self.show()
+            self.LED_btn.show()
+            self.Voice_btn.show()
+            self.Stats_btn.show()
+            self.Logout_btn.show()
+
+        if self.window_state == WindowState.VOICE_WINDOW:
+            print("Hiding Buttons")
+            self.LED_btn.hide()
+            self.Voice_btn.hide()
+            self.Stats_btn.hide()
+            self.Logout_btn.hide()
 
         if self.window_state == WindowState.LED_WINDOW and self.ledscreen == None:
             print("Showing LEDscreen")
@@ -306,12 +324,15 @@ class Hub(QtGui.QMainWindow):
         self.set_window_to_state()
 
 
+
     def setLEDPage(self):
         """
         Change the state of the Arm_status table in MySQL to 'disarmed'
         """
         self.window_state = WindowState.LED_WINDOW
         self.set_window_to_state()
+
+
     
     def setVoicemode(self):
         """
@@ -320,9 +341,31 @@ class Hub(QtGui.QMainWindow):
         
         self.voice_status.setText("Voice Mode ON")
         self.voice_status.repaint()
-        Hub_voice(self)
+        self.hub_voice = Hub_voice(self)
         
+
+	self.window_state = WindowState.VOICE_WINDOW
+        self.set_window_to_state()
+
+        # set timer for first time'   
+        QtCore.QTimer.singleShot(50, self.listenAgain) 
+
+ 
+    def listenAgain(self):
         
+        self.hub_voice.listen_once()
+
+	print("Hub voice State is "+str(self.hub_voice.IS_RUNNING))
+        if self.hub_voice.IS_RUNNING == VoiceState.RUNNING:
+            # set timer to run again
+            QtCore.QTimer.singleShot(400, self.listenAgain) 
+
+        else:       
+	    self.window_state = WindowState.MAIN_WINDOW
+            self.set_window_to_state()
+            self.voice_status.setText("Voice Mode OFF")
+
+ 
     def setLogoutPage(self):
         """
         Change the state of the Arm_status table in MySQL to 'disarmed'
@@ -330,6 +373,7 @@ class Hub(QtGui.QMainWindow):
         self.myAWSIoTMQTTClient.publish("AccessControl/UserPass", json.dumps({"user_name":"","password":""}), 1)
         self.window_state = WindowState.LOCK_WINDOW
         self.set_window_to_state()
+
 
 
     def setLEDs(self, red, green, blue):
@@ -353,118 +397,6 @@ class Hub(QtGui.QMainWindow):
 	return
 
 
-
-
-#    def testCoAP(self):
-#        endpoint = resource.Endpoint(None)
-#        protocol = coap.Coap(endpoint)
-#        client   = Agent(protocol)
-#        reactor.listenUDP(61616, protocol)
-#        reactor.run()
-#
-#    def testMQTT(self):
-#        curr_time = time()
-#        publish.single("AccessControl/MQTT_test", str(now), hostname="test.mosquitto.org") 
-#
-#    def testWebsockets(self):
-#        curr_time = time()
-#        ws = websocket.create_connection("ws://52.34.209.113:8000")
-#	ws.send(str(curr_time))
-#
-#
-#    @gen.coroutine
-#    def connect(self):
-#        """
-#        Connect to the websockets server
-#        on our ec2 server
-#        """
-#
-#        #print "trying to connect"
-#
-#        try:
-#            self.ws = yield websocket_connect(self.url)
-#        except Exception, e:
-#            print "connection error"
-#        else:
-#            #print "connected"
-#            pass
-#
-#
-#    def sendAndRead(self):
-#        """ 
-#        query for login and arm/disarm status and read responses
-#        """
-#
-#        #print("Sending messages!")
-#        self.toggle = 1 - self.toggle
-#
-#        if self.toggle == 1:
-#		self.ws.write_message("login_status")
-#		self.readInput()
-#        else:
-#		self.ws.write_message("arm_status")
-#		self.readInput()
-#
-#
-#
-#    @gen.coroutine
-#    def readInput(self):
-#        """
-#        read a message back from websockets and set update
-#        """
-# 
-#        try:
-#            msg = yield self.ws.read_message()
-#        except:
-#            self.drop_count += 1
-#            if self.drop_count >= 2:
-#		    self.statusBar().showMessage('Connection Error!')
-#                    self.user_data.setText("Disconnected!")
-#            return
-#
-#        self.drop_count = 0
-#
-#        # data is sent 
-#        self.statusBar().clearMessage()
-#        indata = msg.split(":")
-#        if indata[0] == "name" :
-#            self.user_data.setText("Welcome, "+indata[1])
-#        elif indata[0] == "state" :
-#            pass
-#        #print ("Received Data: '"+indata[1]+"'")
-#
-#
-#        
-#    def keep_alive(self):
-#        """ 
-#        heartbeat function of program- send commands
-#        and receive data to display
-#        """
-#        
-#        # reconnect if connection has been lost
-#        if self.ws is None:
-#            self.connect()
-#        else:
-#            if self.first_time:
-#                self.first_time = False
-#            else:
-#                try:
-#                    self.ioloop.start()
-#                except:
-#                    self.connect()
-#            
-#            self.sendAndRead()
-#            
-#            self.ioloop.stop()
-#            self.my_p_callback.stop()
-#            QTimer.singleShot(self.gui_timeout, self.poll_websockets)
-#            
-#
-#    def poll_websockets(self):
-#        """ Take control from GUI for websockets"""
-#
-#        self.my_p_callback.start()
-#        self.ioloop.start()
 
 
 if __name__ == "__main__":
