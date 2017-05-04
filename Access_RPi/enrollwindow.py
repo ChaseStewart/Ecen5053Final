@@ -34,38 +34,64 @@ class EnrollWindow(QtGui.QMainWindow):
         Create the graphical UI
         """
 
+        # create QT font
+        font = QtGui.QFont()
+        font.setFamily(QtCore.QString.fromUtf8("FreeMono"))
+        font.setBold(True)
+        font.setPointSize(20)
+
+        #add background image
+        palette	= QtGui.QPalette()
+        palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Access_RPi/enroll.jpg")))
+        self.setPalette(palette)
+
+        #create Add User button
         self.addUser_btn=QtGui.QPushButton("Add User",self)
         self.addUser_btn.clicked.connect(self.Enroll)
-        
+
+        #create Delete User button
         self.deleteUser_btn=QtGui.QPushButton("Delete User",self)
         self.deleteUser_btn.clicked.connect(self.Delete)
-        
+
+        #create Goback button
         self.goback_btn=QtGui.QPushButton("Logout",self)
         self.goback_btn.clicked.connect(self.goBack)
 
+        #create label to display loggedin user
         self.instructions = QtGui.QLabel(self)
+        self.instructions.setFont(font)
         self.instructions.setText("")
+        self.instructions.setStyleSheet("color: white")
         
-
+        #create label for username
         self.name_lbl=QtGui.QLabel(self)
         self.name_lbl.setText("Name")
+        self.name_lbl.setStyleSheet("color: white")
 
+        #create Lineedit for username
         self.Enteredname=QtGui.QLineEdit(self)
         self.Enteredname.setPlaceholderText("Enter user name")
 
+        #Vbox for all buttons
         self.buttonbox=QtGui.QVBoxLayout()
         self.buttonbox.addWidget(self.addUser_btn)
         self.buttonbox.addWidget(self.deleteUser_btn)
         self.buttonbox.addWidget(self.goback_btn)
+
+        #Hbox for labels
         self.Labelbox = QtGui.QHBoxLayout()
         self.Labelbox.addWidget(self.name_lbl)
         self.Labelbox.addWidget(self.Enteredname)
+
+        #add layouts   
         self.hBox=QtGui.QHBoxLayout()
         self.hBox.addLayout(self.Labelbox)
         self.hBox.addLayout(self.buttonbox)
         self.outerBox = QtGui.QVBoxLayout()
         self.outerBox.addWidget(self.instructions)
         self.outerBox.addLayout(self.hBox)
+
+        #set Layout
         wid = QtGui.QWidget(self)
         self.setCentralWidget(wid)
         wid.setLayout(self.outerBox)
