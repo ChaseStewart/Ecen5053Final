@@ -2,15 +2,10 @@
 # -*- coding: utf-8 -*-
 
 import sys, json, numpy, time
-from tornado.ioloop import IOLoop, PeriodicCallback
-from tornado import gen
-from tornado.websocket import websocket_connect
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import QTimer
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from boto3.session import Session
-
-
 
 from helpers import AccessState
 from enrollwindow import EnrollWindow
@@ -33,25 +28,12 @@ class Access(QtGui.QMainWindow):
 
         super(Access,self).__init__()
 
-	# connection variables
-        self.ws_url = "ws://52.34.209.113:8080/websocket"
-        self.ws_timeout  = 500
-        self.ws_gui_timeout = 250 
-        self.first_time=True
-        self.drop_count = 0
-        self.toggle = 0
-
         # access_state_vars
         self.startWithEnroll = True
         self.enrollWindow = None
         self.customWindow = None
         self.window_state = None 
         self.access = 0
-
-
-	# Tornado Variables
-        self.ws_ioloop = IOLoop.instance()
-        self.ws = None
 
         # verify Variables
         self.verify_result=None
@@ -63,26 +45,18 @@ class Access(QtGui.QMainWindow):
         self.window_state = AccessState.ARM_WINDOW
         self.set_window_to_state()
 
-	
-        if self.use_websockets: 
-            # Connect to the Websockets server
-            #self.connect()
-        
-            # setup the Websocket IO Loop
-            self.my_p_callback = PeriodicCallback(self.keep_alive, self.ws_timeout, io_loop=self.ioloop)
-            self.my_p_callback.start()
-            self.ioloop.start()
-        else:
-            self.rootCAPath="/home/pi/Desktop/root-CA.crt"
-            self.privateKeyPath="/home/pi/Desktop/Access01.private.key"
-            self.certificatePath="/home/pi/Desktop/Access01.cert.pem"
-            self.host="a1qhmcyp5eh8yq.iot.us-west-2.amazonaws.com"
-            self.setupAWS()
+	# set AWS vars
+        self.rootCAPath="/home/pi/Desktop/root-CA.crt"
+        self.privateKeyPath="/home/pi/Desktop/Access01.private.key"
+        self.certificatePath="/home/pi/Desktop/Access01.cert.pem"
+        self.host="a1qhmcyp5eh8yq.iot.us-west-2.amazonaws.com"
+        self.setupAWS()
 
-            self.WORK_PERIOD = 2000 
-            self.myTimer = QTimer()
-            self.myTimer.timeout.connect(self.processSQS)
-            self.myTimer.start(self.WORK_PERIOD)
+	# set SQS processing vars
+        self.WORK_PERIOD = 2000 
+        self.myTimer = QTimer()
+        self.myTimer.timeout.connect(self.processSQS)
+        self.myTimer.start(self.WORK_PERIOD)
 
 
 
@@ -167,10 +141,9 @@ class Access(QtGui.QMainWindow):
                         else:
                             self.state.setText("")
                             self.user_data.setText("Welcome, %s!" % user)
-                            #trail
-                            #self.enrollWindow.instructions.setText("Welcome, %s!" % user)
                             self.window_state = AccessState.DISARM_WINDOW
                             self.set_window_to_state()
+                            self.enrollWindow.instructions.setText("Welcome, %s" % user)
 
             # Now delete the ack'ed message
             for item in acked_messages:
@@ -249,13 +222,16 @@ class Access(QtGui.QMainWindow):
         print("PUB FINGERPRINT\n\t username:%s" % (name))
         self.myAWSIoTMQTTClient.publish("AccessControl/rmFingerprint", str(jsonData), 1)
 
-
+ 
 
     def initUI(self):
         """ 
         Initialize + configure all QT modules used in the GUI
         And place them on the screen in the application
         """
+
+        #add background image
+        #self.setStyleSheet("QWidget {border-image : url(/home/pi/Ecen5053Final/Access_RPi/background.png)}")
 	
 	# create QT font
         font = QtGui.QFont()
@@ -297,6 +273,7 @@ class Access(QtGui.QMainWindow):
 
 	# Password Button
 	self.Submit_btn=QtGui.QPushButton("Submit", self)
+	#Submit_btn.setStyleSheet("QPushButton {border-image : url(/home/pi/Adafruit_Python_DHT/examples/btn_image.png)}")
 	self.Submit_btn.clicked.connect(self.sendLoggedInUser)
         
         self.passwdbox = QtGui.QHBoxLayout()
@@ -363,27 +340,37 @@ class Access(QtGui.QMainWindow):
             self.show()
 
         elif self.window_state == AccessState.DISARM_WINDOW:
-            print("Showing disarm window")
-            self.enrollWindow = EnrollWindow(self)
-            self.enrollWindow.show()
+            if self.enrollWindow == None:
+                print("Showing disarm window")
+                self.enrollWindow = EnrollWindow(self)
+                self.enrollWindow.show()
 
 
     def verify(self):
+	"""
+	Test the user's finger against the FPi sensor's database
+	"""
         my_verify = verifier()
         print("Verification")
         self.statusBar().showMessage("Press your finger")
+
+	# run the test command
         self.verify_result = my_verify.runscript()
+	
+	# for a failure, deny access
         if self.verify_result is None:
     		#self.pubAccessState("Armed")
         	self.statusBar().showMessage("Access Denied")
         	time.sleep(1)
         	self.statusBar().clearMessage()
+
+	# for a success publish a logged-in user
         else:
     		#self.pubAccessState("Disarmed")
                 self.pubFingerprint(state="Success", uname=self.verify_result)
 		self.hide()
         	self.newWindow= EnrollWindow(self)
-                
+ 
 
 
     def sendLoggedInUser(self):
@@ -417,106 +404,11 @@ class Access(QtGui.QMainWindow):
 
 
  
-    @gen.coroutine
-    def connect(self):
-        """
-        Connect to the websockets server
-        on our ec2 server
-        """
-
-        #print "trying to connect"
-
-        try:
-            self.ws = yield websocket_connect(self.url)
-        except Exception, e:
-            print "connection error"
-        else:
-            #print "connected"
-            pass
-
-
-    def sendAndRead(self):
-        """ 
-        query for login and arm/disarm status and read responses
-        """
-
-        #print("Sending messages!")
-        self.toggle = 1 - self.toggle
-
-        if self.toggle == 1:
-		self.ws.write_message("login_status")
-		self.readInput()
-        else:
-		self.ws.write_message("arm_status")
-		self.readInput()
-
-
-
-    @gen.coroutine
-    def readInput(self):
-        """
-        read a message back from websockets and set update
-        """
- 
-        try:
-            msg = yield self.ws.read_message()
-        except:
-            self.drop_count += 1
-            if self.drop_count >= 2:
-		    self.statusBar().showMessage('Connection Error!')
-                    self.user_data.setText("Disconnected!")
-                    self.state.setText("")
-            return
-
-        self.drop_count = 0
-
-        # data is sent 
-        self.statusBar().clearMessage()
-        indata = msg.split(":")
-        if indata[0] == "name" :
-            self.user_data.setText("Welcome, "+indata[1])
-        elif indata[0] == "state" :
-            self.state.setText("Arm/Disarm state is: "+indata[1])
-        #print ("Received Data: '"+indata[1]+"'")
-
-
-        
-    def keep_alive(self):
-        """ 
-        heartbeat function of program- send commands
-        and receive data to display
-        """
-        
-        # reconnect if connection has been lost
-        if self.ws is None:
-            self.connect()
-        else:
-            if self.first_time:
-                self.first_time = False
-            else:
-                try:
-                    self.ioloop.start()
-                except:
-                    self.connect()
-            
-            self.sendAndRead()
-            
-            self.ioloop.stop()
-            self.my_p_callback.stop()
-            QTimer.singleShot(self.gui_timeout, self.poll_websockets)
-
-
-
-    def poll_websockets(self):
-        """ Take control from GUI for websockets"""
-
-        self.my_p_callback.start()
-        self.ioloop.start()
-
-
-
 if __name__ == "__main__":
-    """ Run program if called as main function """
+    """ 
+    Run program if called as main function
+    """
+
     app = QtGui.QApplication(sys.argv)
     access=Access()
     sys.exit(app.exec_())
