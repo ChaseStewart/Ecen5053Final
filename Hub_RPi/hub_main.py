@@ -15,7 +15,8 @@ from helpers import WindowState, VoiceState
 from lockedwindow import LockedWindow
 from ledwindow import LEDWindow
 from statswindow import StatsWindow
-from fork_hub_voice import Hub_voice
+from hub_voice import Hub_voice
+
 
 
 class Hub(QtGui.QMainWindow):
@@ -80,6 +81,8 @@ class Hub(QtGui.QMainWindow):
         self.window_state = WindowState.LOCK_WINDOW
         self.set_window_to_state()
 
+
+
     def setupAWS(self):
 
         # Setup AWS IoT basics
@@ -112,7 +115,6 @@ class Hub(QtGui.QMainWindow):
         """
         Select a window to display using enums from Helpers
         """
-
 
 	""" FIRST PERFORM TEARDOWN """
         print("Changing state to %d" % self.window_state)
@@ -198,6 +200,8 @@ class Hub(QtGui.QMainWindow):
                 acked_messages.append(msg['ReceiptHandle'])
 		print body
                 json_body = json.loads(body)
+
+		# process login type messages and set access state
 		if json_body['type'] == 'login':               
  
 			arm_state = json_body['arm_state']
@@ -216,24 +220,25 @@ class Hub(QtGui.QMainWindow):
 			    self.window_state = WindowState.MAIN_WINDOW 
 			    self.set_window_to_state()
 
-
+		# process overhead type messages and set latency
 		elif json_body['type'] == 'overhead':
 			if self.window_state == WindowState.STATS_WINDOW:
 				self.ws_latency   = json_body['ws_lat']
 				self.mqtt_latency = json_body['mqtt_lat']
 				self.coap_latency = json_body['coap_lat']
 
-        			
+        			# call update to stats grpah
 				if self.statsscreen != None:
 					self.statsscreen.latencyStats(self.ws_latency, self.coap_latency, self.mqtt_latency)
 
-
+		# process LED type messages and send websocket to FCServer
 		elif json_body['type'] == 'led':
 			if self.window_state != WindowState.LOCK_WINDOW:
 				self.red   = json_body['red']
 				self.blue  = json_body['blue']
 				self.green = json_body['green']
 
+				# format and send WS message
 				self.setLEDs(self.red, self.green, self.blue)
 
             # Now delete the ack'ed message
@@ -280,7 +285,6 @@ class Hub(QtGui.QMainWindow):
         # Create Voice mode button
 	self.Voice_btn=QtGui.QPushButton("Voice Mode",self)
         self.Voice_btn.clicked.connect(self.setVoicemode)
-        
 
 	# Create Stats button        
 	self.Stats_btn=QtGui.QPushButton("System Stats",self)
@@ -343,27 +347,35 @@ class Hub(QtGui.QMainWindow):
         self.voice_status.repaint()
         self.hub_voice = Hub_voice(self)
         
-
+	# change state to VOICE and set window
 	self.window_state = WindowState.VOICE_WINDOW
         self.set_window_to_state()
 
         # set timer for first time'   
         QtCore.QTimer.singleShot(50, self.listenAgain) 
 
+
  
     def listenAgain(self):
+	"""
+	Use a timer to give the the app time to process SQS messages between voice commands
+	"""
         
+	# first listen
         self.hub_voice.listen_once()
 
+	# if the command was not "end voice", schedule another listen
 	print("Hub voice State is "+str(self.hub_voice.IS_RUNNING))
         if self.hub_voice.IS_RUNNING == VoiceState.RUNNING:
             # set timer to run again
             QtCore.QTimer.singleShot(400, self.listenAgain) 
 
+	# if the command was "end voice", show the buttons again and change state to MAIN
         else:       
 	    self.window_state = WindowState.MAIN_WINDOW
             self.set_window_to_state()
             self.voice_status.setText("Voice Mode OFF")
+
 
  
     def setLogoutPage(self):
@@ -377,18 +389,24 @@ class Hub(QtGui.QMainWindow):
 
 
     def setLEDs(self, red, green, blue):
+	"""
+	Take a RGB tuple, set that value for all 60 LEDs in the strip
+	"""
 
 	out_list = []
         my_tuple = (red, green, blue)
 	
+	# create a list of tuples for WS output
 	for i in range(self.num_pixels):
             out_list.append(my_tuple)
 	
+	# now try to send pixels to FCserver, else fail gracefully
 	if self.led_client.put_pixels(out_list, channel=0):
 		pass
 	else:
 		print("Not connected!")
 
+	# if using fast transition, double-send LEDs 
 	if self.fast_transition:	
 		if self.led_client.put_pixels(out_list, channel=0):
 			pass
