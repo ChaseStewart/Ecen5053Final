@@ -219,6 +219,11 @@ class StatsWindow(QtGui.QMainWindow):
 
     def initUI(self):
 
+        #add background image
+        palette	= QtGui.QPalette()
+        palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Hub_RPi/stats")))
+        self.setPalette(palette)
+
 	# create QT font
         self.font = QtGui.QFont()
         self.font.setFamily(QtCore.QString.fromUtf8("Helvetica"))
@@ -247,6 +252,7 @@ class StatsWindow(QtGui.QMainWindow):
 	# Create user-name label
         self.stats=QtGui.QLabel(self)
         self.stats.setFont(self.font)
+        self.stats.setStyleSheet("color: white")
         self.stats.setText("System Stats")
         
 	# Create legend label

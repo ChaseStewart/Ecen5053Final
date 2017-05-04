@@ -42,15 +42,21 @@ class Hub_voice(QtGui.QMainWindow):
 
     def listen_once(self):
         # Record Audio
-        self.speech_text = sr.Recognizer()
-        with sr.Microphone() as source:
-            self.speech_text.adjust_for_ambient_noise(source)
-            print("set minimum energy threshold to {}".format(self.speech_text.energy_threshold)) 
+        try:
+            self.speech_text = sr.Recognizer()
+            with sr.Microphone() as source:
+                self.speech_text.adjust_for_ambient_noise(source)
+                print("set minimum energy threshold to {}".format(self.speech_text.energy_threshold)) 
 
-            print("Say something!")
-            audio = self.speech_text.listen(source)
-            print("Said something!")
- 	    self.process_voice(audio)
+                print("Say something!")
+                audio = self.speech_text.listen(source)
+                print("Said something!")
+                self.process_voice(audio)
+
+        except Exception as e:
+            print e
+            self.IS_RUNNING = VoiceState.ERROR
+            
 
 		
     def process_voice(self, audio):

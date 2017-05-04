@@ -257,6 +257,11 @@ class Hub(QtGui.QMainWindow):
         Initialize + configure all QT modules used in the GUI
         And place them on the screen in the application
         """
+        #add background image
+        palette	= QtGui.QPalette()
+        palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Hub_RPi/background.png")))
+        self.setPalette(palette)
+
 	
 	# create QT font
         font = QtGui.QFont()
@@ -267,11 +272,13 @@ class Hub(QtGui.QMainWindow):
 	# Create user-name label
         self.user_data=QtGui.QLabel(self)
         self.user_data.setFont(font)
+        self.user_data.setStyleSheet("color: white")
         self.user_data.setText("No Logged In User")
 
         # Create voice_status label
         self.voice_status=QtGui.QLabel(self)
         self.voice_status.setFont(font)
+        self.voice_status.setStyleSheet("color: white")
         self.voice_status.setText("Voice Mode off")
 
 	# Create status bar
@@ -350,7 +357,7 @@ class Hub(QtGui.QMainWindow):
 	# change state to VOICE and set window
 	self.window_state = WindowState.VOICE_WINDOW
         self.set_window_to_state()
-
+        
         # set timer for first time'   
         QtCore.QTimer.singleShot(50, self.listenAgain) 
 
@@ -370,10 +377,21 @@ class Hub(QtGui.QMainWindow):
             # set timer to run again
             QtCore.QTimer.singleShot(400, self.listenAgain) 
 
+        elif self.hub_voice.IS_RUNNING == VoiceState.ERROR:
+            print ("Voice error")
+            
+            self.voice_status.setText("Problem with mic")
+            self.voice_status.repaint()
+            sleep(2)
+            self.window_state = WindowState.MAIN_WINDOW
+            self.set_window_to_state()
+            self.voice_status.setText("Voice Mode OFF")
+
 	# if the command was "end voice", show the buttons again and change state to MAIN
         else:       
 	    self.window_state = WindowState.MAIN_WINDOW
             self.set_window_to_state()
+            
             self.voice_status.setText("Voice Mode OFF")
 
 

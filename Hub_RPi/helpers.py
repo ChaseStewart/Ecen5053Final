@@ -25,4 +25,5 @@ class VoiceState(object):
     """
     RUNNING = 0
     STOP    = 1
+    ERROR   = 2
 
