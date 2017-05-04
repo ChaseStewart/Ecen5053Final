@@ -53,7 +53,7 @@ class Access(QtGui.QMainWindow):
         self.setupAWS()
 
 	# set SQS processing vars
-        self.WORK_PERIOD = 2000 
+        self.WORK_PERIOD = 500 
         self.myTimer = QTimer()
         self.myTimer.timeout.connect(self.processSQS)
         self.myTimer.start(self.WORK_PERIOD)
@@ -111,6 +111,8 @@ class Access(QtGui.QMainWindow):
                 acked_messages.append(msg['ReceiptHandle'])
                 json_body = json.loads(body)
                 print(json_body)
+
+                #decode json for remove index
                 if json_body['type'] == 'rm_index':
                         user_id = json_body['user_id']
                         try:
@@ -127,6 +129,7 @@ class Access(QtGui.QMainWindow):
                         except:
                             print("Error- message could not be handled!")
 
+                #decode json for login
                 elif json_body['type'] == 'login':
                         
                         arm_state = json_body['arm_state']
@@ -143,7 +146,8 @@ class Access(QtGui.QMainWindow):
                             self.user_data.setText("Welcome, %s!" % user)
                             self.window_state = AccessState.DISARM_WINDOW
                             self.set_window_to_state()
-                            self.enrollWindow.instructions.setText("Welcome, %s" % user)
+                            self.enrollWindow.instructions.setText("Welcome, %s!" % user)
+
 
             # Now delete the ack'ed message
             for item in acked_messages:
@@ -160,6 +164,7 @@ class Access(QtGui.QMainWindow):
         Publish Fingerprint Authentication results to AWS        
         """
 
+        #convert data to json format
         armData = {}
         if uname == None:
             uname="None"
@@ -167,6 +172,7 @@ class Access(QtGui.QMainWindow):
         armData['user_id']  =str(uname) 
         jsonData = json.dumps(armData)
 
+        #publish to topic
         print("PUB FINGERPRINT\n\tSending state:%s, user_id:%s" % (state, uname))
         self.myAWSIoTMQTTClient.publish("AccessControl/Fingerprint", str(jsonData), 1)
 
@@ -181,11 +187,14 @@ class Access(QtGui.QMainWindow):
             self.statusBar().showMessage('Username and Password must each be > 5 chars!')
             return
 
+        #convert data to json format
         unameData = {}
         unameData['user_name']=str(uname)
         unameData['password']=str(passwd)
         jsonData = json.dumps(unameData)
+        print(jsonData)
 
+        #publish to topic
         print("PUB USER PASS\n\tSending user:%s, password:%s" % (uname, "*"*(len(passwd)-4)+passwd[-3:]))
         self.myAWSIoTMQTTClient.publish("AccessControl/UserPass", str(jsonData), 1)
 
@@ -194,6 +203,8 @@ class Access(QtGui.QMainWindow):
         """
         Publish new Fingerprint added to AWS       
         """
+
+        #convert data to json format
         usrData = {}
         if name == None:
                 name="None"
@@ -202,7 +213,8 @@ class Access(QtGui.QMainWindow):
         usrData['name']=str(name) 
         usrData['user_id']  =str(user_id) 
         jsonData = json.dumps(usrData)
-
+        
+        #publish to topic
         print("PUB to addFINGERPRINT\n\t username:%s, user_id:%s" % (name,user_id))
         self.myAWSIoTMQTTClient.publish("AccessControl/addFingerprint", str(jsonData), 1)
 
@@ -231,18 +243,22 @@ class Access(QtGui.QMainWindow):
         """
 
         #add background image
-        #self.setStyleSheet("QWidget {border-image : url(/home/pi/Ecen5053Final/Access_RPi/background.png)}")
+        palette	= QtGui.QPalette()
+        palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Access_RPi/background.jpg")))
+        self.setPalette(palette)
+
 	
 	# create QT font
         font = QtGui.QFont()
-        font.setFamily(QtCore.QString.fromUtf8("FreeMono"))
+        #font.setFamily(QtCore.QString.fromUtf8("FreeMono"))
         font.setBold(True)
-        font.setPointSize(20)
+        font.setPointSize(15)
 
 	# Create user-name label
         self.user_data=QtGui.QLabel(self)
         self.user_data.setFont(font)
         self.user_data.setText("")
+        
 
 	# Create alarm-state label
         self.state=QtGui.QLabel(self)
@@ -252,7 +268,11 @@ class Access(QtGui.QMainWindow):
 
         # Label for username
         self.input1Label=QtGui.QLabel(self)
+        self.input1Label.setFont(font)
         self.input1Label.setText("Username")
+        self.input1Label.setStyleSheet("color: white")
+        
+
 
         # Create text input
         self.input1=QtGui.QLineEdit(self)
@@ -264,7 +284,11 @@ class Access(QtGui.QMainWindow):
 
         # Label for username
         self.input2Label=QtGui.QLabel(self)
+        self.input2Label.setFont(font)
         self.input2Label.setText("Password")
+        self.input2Label.setStyleSheet("color: white")
+        
+        
 
         # Create text input
         self.input2=QtGui.QLineEdit(self)
@@ -273,7 +297,6 @@ class Access(QtGui.QMainWindow):
 
 	# Password Button
 	self.Submit_btn=QtGui.QPushButton("Submit", self)
-	#Submit_btn.setStyleSheet("QPushButton {border-image : url(/home/pi/Adafruit_Python_DHT/examples/btn_image.png)}")
 	self.Submit_btn.clicked.connect(self.sendLoggedInUser)
         
         self.passwdbox = QtGui.QHBoxLayout()
@@ -323,27 +346,33 @@ class Access(QtGui.QMainWindow):
 
 
     def set_window_to_state(self):
+        """
+            switching between windows
+        """
 
         print ("Arm state is %d" % self.window_state)
-
+        
+        #display Arm Window
         if self.window_state != AccessState.ARM_WINDOW:
             print("Hiding arm window")
             self.hide()
 
+        #display Disarm Window
         if self.window_state != AccessState.DISARM_WINDOW and self.enrollWindow != None:
             print("Hiding disarm window")
             self.enrollWindow.teardown()
             self.enrollWindow = None
 
+        #display Arm Window
         if self.window_state == AccessState.ARM_WINDOW:
             print("Showing arm window")
             self.show()
 
+        #display Disarm Window
         elif self.window_state == AccessState.DISARM_WINDOW:
-            if self.enrollWindow == None:
-                print("Showing disarm window")
-                self.enrollWindow = EnrollWindow(self)
-                self.enrollWindow.show()
+            print("Showing disarm window")
+            self.enrollWindow = EnrollWindow(self)
+            self.enrollWindow.show()
 
 
     def verify(self):
@@ -377,9 +406,14 @@ class Access(QtGui.QMainWindow):
         """
         Send (username, password) pair to AWS for authentication
         """
+
+        #get text from labels
         uname =self.input1.text()
         passwd=self.input2.text()
+
+        #publish to topic
         self.pubUserPass(uname, passwd)
+        
         return
 
 
@@ -388,6 +422,7 @@ class Access(QtGui.QMainWindow):
         """
         Change the state of the Arm_status table in MySQL to 'disarmed' and set current user
         """
+        
         rand_ID = int(numpy.floor(numpy.random.uniform(0,4)))
 	
         self.pubFingerprint(state="Success", uname=rand_ID)
@@ -399,6 +434,7 @@ class Access(QtGui.QMainWindow):
         """
         Change the state of the Arm_status table in MySQL to 'disarmed'
         """
+        
         self.pubFingerprint(state="Failure", uname=None)
         return
 
