@@ -17,3 +17,11 @@ class GraphState(object):
     LIGHTS  = 0
     RGB     = 1
     LATENCY = 2
+
+class VoiceState(object):
+    """
+    State machine for Voice
+    """
+    RUNNING = 0
+    STOP    = 1
+
