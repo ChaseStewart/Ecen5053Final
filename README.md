@@ -36,6 +36,11 @@ The Hub provides the following functions:
 * Logout (publish an "State == Armed" message and go back to the lock screen with 0 functionality)
 * Voice Control mode (switch to accepting Voice Commands)
 
+## Access GUI
+At first, the Access page gives a prompt for login using either fingerprint (if previously configured for the user) or username and password (always works for a user). All users default to having fingerprints disabled (duhh), and only can enable this by creating a user/password, logging in, then adding fingerprint for themselves.
+Access GUI will allow for adding or removing fingerprints for users. When the logout button is pressed on either device, it immediately publishes this message: 
+
+
 ## Voice Control
 The Voice API is enabled by clicking the Voice Mode button- Upon clicking the voice button, all hub buttons are hidden and Voice mode commences. The voice API responds to the following commands:
 * "lights red"   - set lights to fully red
@@ -79,7 +84,7 @@ The CentOS server hosts the website, a Node.JS listener for publishing LED messa
 #### AWS IoT (Devices, Rules, Lambda Functions)
 The IOT rules subscribe to the various message types and execute lambda functions on them (verify username/password against the DB, write/remove fingerprint-to-user entries from the DB, republish ArmState/login messages on successful DB authentication).
 
-#### ToDo
+## ToDo
 We can't promise this will ever get done, as this is a class project, but it would be cool
 to create ansible scripts that can deploy the Access, Hub, and Webserver.
 
