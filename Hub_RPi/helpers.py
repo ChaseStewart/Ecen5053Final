@@ -1,6 +1,10 @@
 #!/usr/bin/python
 
 
+"""
+A set of enumeration classes to keep code clean
+"""
+
 class WindowState(object):
     """
     Just a state machine for the hub window states
@@ -14,6 +18,7 @@ class GraphState(object):
     """
     Just a state machine for the hub graph states
     """
-    LIGHTS  = 0
+    LIGHTS    = 0
     OVERHEAD  = 1
     LATENCY   = 2
+

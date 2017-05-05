@@ -1,15 +1,21 @@
+#!/usr/bin/python
+
+from time import time
+import sys, json
+
+# import twisted
 from twisted.internet import reactor, protocol
 from twisted.internet.defer       import inlineCallbacks, DeferredList
 from twisted.internet.endpoints   import clientFromString
 from twisted.application.internet import ClientService, backoffPolicy
 
+# import websockets, mqtt, coap
 from autobahn.twisted.websocket import WebSocketServerProtocol, WebSocketServerFactory
 from mqtt.client.factory import MQTTFactory
 import txthings.resource as resource
 import txthings.coap     as coap
-from time import time
-import sys, json
 
+# import AWS IOT
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 
 # globals 
@@ -21,12 +27,11 @@ coap_size    = None
 ws_latency   = None
 ws_size      = None
 
-
+# AWS connection vars
 rootCA      = "root-CA.crt"
 privatePath = "sim_access.private.key"
 certPath    = "sim_access.cert.pem"
-myhost        = "alqhmcyp5eh8yq.iot.us-west-2.amazonaws.com"
-myhost="a1qhmcyp5eh8yq.iot.us-west-2.amazonaws.com" 
+myhost      = "alqhmcyp5eh8yq.iot.us-west-2.amazonaws.com"
 
 
 
@@ -57,7 +62,13 @@ class PerfPublisher():
 		self.ws_size      = None
 		self.has_ws       = False
 
+
+
 	def setVals(self, protocol, latency, size):
+		"""
+		Take latency and overhead from function call and set class vars
+		if stats are taken for all 3 protocols, then publish a message
+		"""
 		if protocol == "MQTT" and self.mqtt_latency == None and self.mqtt_size == None:
 			self.mqtt_latency = latency
 			self.mqtt_size    = size
@@ -72,13 +83,21 @@ class PerfPublisher():
 			self.ws_latency = latency
 			self.ws_size    = size
 			self.has_ws     = True	
-		
+	
+		# print state of all 3 protocols	
 		print ("WS: %s, CoAP: %s, MQTT: %s" % (self.has_ws, self.has_coap, self.has_mqtt))
 		if self.has_ws and self.has_coap and self.has_mqtt:
+			# call publish when we have all 3 protocols
 			self.publishJSON()	
 
 
+
 	def publishJSON(self):
+		"""
+		Setup AWS IOT, make JSON from stats, then publish
+		"""
+
+		# setup AWS and connect
 		AWSClient = AWSIoTMQTTClient("basicPubSub")
 		AWSClient.configureEndpoint(myhost, 8883)
 		AWSClient.configureCredentials(rootCA, privatePath, certPath)
@@ -90,6 +109,7 @@ class PerfPublisher():
 		AWSClient.configureMQTTOperationTimeout(10)
 		AWSClient.connect()
 
+		# create JSON object
 		jsonData = {}	
 		jsonData['type'] = 'overhead'
 		jsonData['mqtt_lat'] = self.mqtt_latency
@@ -98,15 +118,20 @@ class PerfPublisher():
 		jsonData['ws_ovh']   = self.ws_size
 		jsonData['coap_lat'] = self.coap_latency
 		jsonData['coap_ovh'] = self.coap_size
-
 		strData= json.dumps(jsonData)
-		print("Published data!")
-		#print strData
+		
+		# publish JSON
 		AWSClient.publish("AccessControl/performance", str(strData), 1)
+		print("Published data!")
+
+		# reset stats for new values
 		self.clearVals()
 
 
-# Fake protos
+
+"""
+Fake protos- use these to verify data is arriving
+"""
 
 class fake_WSProto(protocol.Protocol):
 	def dataReceived(self, data):
@@ -122,7 +147,9 @@ class fake_CoAPProto(protocol.Protocol):
 
 
 
-# real protos
+"""
+Real protocols below
+"""
 
 class WSProto(WebSocketServerProtocol):
 	"""
@@ -130,19 +157,24 @@ class WSProto(WebSocketServerProtocol):
 	"""
 
 	def onConnect(self, request):
-		"Websockets connected localhost:8000\n"
+		"""
+		Connection Callback
+		"""
+		print "Websockets connected localhost:8000\n"
 		pass
 
 	def onOpen(self):
+		"""
+		Open Callback
+		"""
 		pass
 
 	def onMessage(self, payload, isBinary):
 		"""
-		Calculate overhead in size and time
+		Calculate overhead in size and time, set publisher val
 		"""
 		now = time()
 		delta = now - float(format(payload.decode('utf8')))
-		print("packet_len is "+str(len(payload)))
 		print ("Delta time is "+str(delta))
 
 		ws_latency   = delta
@@ -152,29 +184,41 @@ class WSProto(WebSocketServerProtocol):
 		publisher.setVals("WS", ws_latency, ws_size)
 
 
+# much of this code courtesy of the CoAP package example code
+
 class CoAPProto(resource.CoAPResource):
 	"""
 	CoAP Protocol
 	"""
 	#isLeaf = True
 
-	def __init__(self, start=0):
+	def __init__(self):
+		"""
+		Initialize CoAP resource
+		"""
+
 		resource.CoAPResource.__init__(self)
 		self.visible=True
 		self.addParam(resource.LinkParam("title", "delta resource"))
 		print("CoAP connected to localhost:5683\n")
 
 	def render_GET(self, request):
-		payload = "Use GET instead!"
+		"""
+		Respond to GET request by asking for a put instead
+		"""
+		payload = "Use PUT instead!"
 		response = coap.Message(code=coap.CONTENT, payload = payload)
 		return defer.succeed(response)
 
 	def render_PUT(self, request):
+		"""
+		Respond to PUT request by taking latency, overhead and sending to publisher
+		"""
 		now = time()
 		delta = now - float(request.payload)
 		print request.payload
-		print("packet_len is "+str(len(request.payload)))
 		print ("Delta time is "+str(delta))
+		
 		coap_latency   = delta
 		coap_size      = len(request.payload)
 		global publisher
@@ -185,14 +229,22 @@ class CoAPProto(resource.CoAPResource):
 
 
 
+# much of this code courtesy of the MQTT package example code
+
 class MQTTProto(ClientService):
 	"""
 	MQTT protocol
 	"""
 	def __init(self, endpoint, factory):
+		"""
+		Create MQTT client service
+		"""
 	        ClientService.__init__(self, endpoint, factory, retryPolicy=backoffPolicy())
 
 	def startService(self):
+		"""
+		Start the MQTT service
+		"""
 		print("starting MQTT Client Subscriber Service")
 		# invoke whenConnected() inherited method
 		self.whenConnected().addCallback(self.connectToBroker)
@@ -201,9 +253,9 @@ class MQTTProto(ClientService):
 
 	@inlineCallbacks
 	def connectToBroker(self, protocol):
-		'''
+		"""
 		Connect to MQTT broker
-		'''
+		"""
 		self.protocol                 = protocol
 		self.protocol.onPublish       = self.onPublish
 		self.protocol.onDisconnection = self.onDisconnection
@@ -219,6 +271,10 @@ class MQTTProto(ClientService):
 
 
 	def subscribe(self):
+		"""
+		Test the subscription callback by printing 
+		"""
+
 		def _print_result():
 			print("Connected!")
 		
@@ -234,12 +290,11 @@ class MQTTProto(ClientService):
 
 
 	def onPublish(self, topic, payload, qos, dup, retain, msgId):
-		'''
-		Callback Receiving messages from publisher
-		'''
+		"""
+		MQTT handle callback, get overhead and latency and send to publisher
+		"""
 		now = time()
 		delta = now - float(format(payload.decode('utf8')))
-		print("packet_len is "+str(len(payload)))
 		print ("Delta time is "+str(delta))
 		
 		mqtt_latency   = delta
@@ -257,13 +312,7 @@ class MQTTProto(ClientService):
 		print(" >< Connection was lost ! ><, reason={%s}" % reason)
 		self.whenConnected().addCallback(self.connectToBroker)
 
-	
-def printResult(result):
-	print(result)
 
-def printError(failure):
-	import sys
-	sys.stderr.write(str(failure))
 
 def main():
 	"""

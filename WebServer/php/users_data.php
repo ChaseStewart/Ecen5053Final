@@ -13,10 +13,10 @@
                 <!-- connect to sql database to get data -->
 		<?php
                         /*data required for sql connection*/
-			$host = "localhost";
-			$user = "root";
-			$db_name= "users_data";
-			$con = mysql_connect($host, $user);
+			$host    = "localhost";
+			$user    = "root";
+			$db_name = "users_data";
+			$con     = mysql_connect($host, $user);
 
 			if (!$con) 
 			{ 
@@ -24,7 +24,7 @@
 			} 
                         /*sql query to get data from table*/
 			mysql_select_db('users_data'); 
-			$sql='SELECT u_d.name,u_d.email,ref.name FROM users_data u_d LEFT JOIN ref_access_table ref ON ref.id = u_d.access';
+			$sql    ='SELECT u_d.name,u_d.email,ref.name FROM users_data u_d LEFT JOIN ref_access_table ref ON ref.id = u_d.access';
 			$result = mysql_query($sql,$con);
 			if(!$result){
 				die('could not get data:'.mysql_error());
