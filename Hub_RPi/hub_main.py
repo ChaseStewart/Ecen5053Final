@@ -257,6 +257,11 @@ class Hub(QtGui.QMainWindow):
         Initialize + configure all QT modules used in the GUI
         And place them on the screen in the application
         """
+
+        #add background image
+        palette	= QtGui.QPalette()
+        palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Hub_RPi/background.png")))
+        self.setPalette(palette)
 	
 	# create QT font
         font = QtGui.QFont()

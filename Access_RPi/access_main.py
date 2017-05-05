@@ -257,6 +257,7 @@ class Access(QtGui.QMainWindow):
 	# Create user-name label
         self.user_data=QtGui.QLabel(self)
         self.user_data.setFont(font)
+        self.user_data.setStyleSheet("color: white")
         self.user_data.setText("")
         
 
