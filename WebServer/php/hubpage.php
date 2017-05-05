@@ -8,10 +8,22 @@
 		<meta http-equiv="X-UA-Compatible" content="IE=edge">
 
 		<link rel="stylesheet" href="http://s3.amazonaws.com/codecademy-content/courses/ltp/css/bootstrap.css">
+		<link rel="stylesheet" href="css/main.css">
 
 	</head>
 
 	<body>
+
+	<div class="nav">
+		<div class="container">
+			<ul>
+				<li class="col-sm-3 text-center"><a href="#">Hubby.io</a></li>
+				<li class="col-sm-3 text-center"><a href="set_LEDs.php">Set LEDs</a></li>
+				<li class="col-sm-3 text-center"><a onclick="alert('This webpage created by Mounika and Chase for Embedded Interface Design!');">Info</a></li>
+				<li class="col-sm-3 text-center"><a href="index.html">Logout</a></li>
+			</ul>
+		</div>
+	</div>
 	
 	<div class="container">
 		<div class="row" style="margin-top: 20px; margin-bottom: 20px">
@@ -78,7 +90,8 @@
 				<button class="btn btn-info btn-lg" onclick="window.location='set_LEDs.php'">LEDs</button><br /><br />
 				<!--<button class="btn btn-info btn-lg" onclick="alert('Not yet implemented!');">Music</button><br /><br /> -->
 				<!--<button class="btn btn-info btn-lg" onclick="alert('Not yet implemented!');">Stats</button><br /><br /> -->
-				<button class="btn btn-info btn-lg" onclick="alert('This webpage created by Mounika and Chase for Embedded Interface Design!');">Info</button>
+				<button class="btn btn-info btn-lg" onclick="alert('This webpage created by Mounika and Chase for Embedded Interface Design!');">Info</button><br /><br />
+				<button class="btn btn-info btn-lg" onclick="window.location='index.html'">Log Out</button>
 			</div>
 			<div class="col-md-2"></div>
 		</div>
