@@ -28,7 +28,7 @@ class Hub_voice(QtGui.QMainWindow):
 
         """
         start listeneing
-        """"
+        """
     
         super(Hub_voice,self).__init__(parent)
 
@@ -74,11 +74,11 @@ class Hub_voice(QtGui.QMainWindow):
 		
     def process_voice(self, audio):
 
-        """
+            """
             Process the audio recorded and send commands
-        """
+            """
             
-        # Speech recognition using Google Speech Recognition
+            # Speech recognition using Google Speech Recognition
             try:
                 Resp_Text = self.speech_text.recognize_google(audio)
                 print("You said: " + Resp_Text)
@@ -210,6 +210,7 @@ class Hub_voice(QtGui.QMainWindow):
 	
                 
 if __name__ == "__main__":
+    
     """ Run program if called as main function """
     app = QtGui.QApplication(sys.argv)
     voice_control=Hub_voice()

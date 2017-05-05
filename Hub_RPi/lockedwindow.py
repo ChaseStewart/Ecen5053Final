@@ -30,7 +30,7 @@ class LockedWindow(QtGui.QMainWindow):
 
         #add background image
         palette	= QtGui.QPalette()
-        palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Hub_RPi/securitybackground.jpg")))
+        palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Assets/Hub/securitybackground.jpg")))
         self.setPalette(palette)
 
 	# create QT font
