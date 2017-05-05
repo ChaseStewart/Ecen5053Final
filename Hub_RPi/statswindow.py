@@ -218,6 +218,9 @@ class StatsWindow(QtGui.QMainWindow):
 
 
     def initUI(self):
+        """
+        Initialise the GUI
+        """
 
         #add background image
         palette	= QtGui.QPalette()
@@ -290,6 +293,10 @@ class StatsWindow(QtGui.QMainWindow):
 
     def ledStats(self):
 
+        """
+        To see the lights turned ON and OFF
+        """
+
         #vars to get the RGB values from parent
         self.red = self.parent.red
         self.green = self.parent.green
@@ -321,6 +328,10 @@ class StatsWindow(QtGui.QMainWindow):
 
 
     def latencyStats(self, mqtt, coap, ws):
+
+        """
+        get the time taken for MQTT,CoAP,Websockets
+        """
 	
 	# When count < len(graph), just populate graph
 	if self.latencyCount < 10:
@@ -347,6 +358,10 @@ class StatsWindow(QtGui.QMainWindow):
 
 
     def RGBStats(self):
+
+        """
+        Plot a graph for the ratio of RGB in a color
+        """
         
 	#vars to get the RGB values from parent
         self.red   = self.parent.red
@@ -409,7 +424,9 @@ class StatsWindow(QtGui.QMainWindow):
 
 
     def startTests(self):
-
+        """
+        start the tests for all protocols
+        """
         self.testMQTT()
         self.testWebsockets()
         self.testCoAP()
@@ -418,6 +435,9 @@ class StatsWindow(QtGui.QMainWindow):
 
 
     def testCoAP(self):
+        """
+        send a default message(time) to the client
+        """
         host = '52.34.209.113'
         port = 5683
         path = 'test'
@@ -432,12 +452,18 @@ class StatsWindow(QtGui.QMainWindow):
 
 
     def testMQTT(self):
+        """
+        send a default message(time) to mosquitto broker
+        """
         curr_time = time()
         publish.single("AccessControl/MQTT_test", str(curr_time), hostname="test.mosquitto.org") 
 
 
 
     def testWebsockets(self):
+        """
+        send  a default message(time) by creating a websocket
+        """
         ws = websocket.create_connection("ws://52.34.209.113:8000")
         curr_time = time()
 	ws.send(str(curr_time))
@@ -445,12 +471,18 @@ class StatsWindow(QtGui.QMainWindow):
 
 
     def goBack(self):
+        """
+        Navigate back to home page
+        """
         self.parent.window_state = WindowState.MAIN_WINDOW
         self.parent.set_window_to_state()
 
 
 
     def teardown(self):
+        """
+        close the window before navigation
+        """
         self.timer.stop()
         self.close()
 

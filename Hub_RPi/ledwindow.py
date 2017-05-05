@@ -27,6 +27,10 @@ class LEDWindow(QtGui.QMainWindow):
 
     def initUI(self):
 
+        """
+        Add the elements to GUI
+        """
+
         #add background image
         palette	= QtGui.QPalette()
         palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Hub_RPi/lights.jpg")))
@@ -100,6 +104,10 @@ class LEDWindow(QtGui.QMainWindow):
 
 
     def verifyColors(self):
+
+        """
+        Validate if value entered is a valid value
+        """
 	if self.LEDgreenInput.text() == "" or self.LEDredInput.text() == "" or self.LEDblueInput.text() == "":
 		self.statusBar().setStyleSheet("color: red; font-size:18pt")
 		self.statusBar().showMessage("must fill out all three values")
@@ -135,11 +143,17 @@ class LEDWindow(QtGui.QMainWindow):
 
 
     def clearEntries(self):
+        """
+        Clear the values entered
+        """
         self.LEDgreenInput.clear()
         self.LEDblueInput.clear()
         self.LEDredInput.clear()
 
     def SubmitLED(self):
+        """
+        Publish the values to topic
+        """
         if self.verifyColors():
             jsonData = {}
             jsonData['type']  = 'led'
@@ -160,11 +174,17 @@ class LEDWindow(QtGui.QMainWindow):
 
 
     def goBack(self):
+        """
+        Navigate to home page
+        """
         self.parent.window_state = WindowState.MAIN_WINDOW
         self.parent.set_window_to_state()
 
 
 
     def teardown(self):
+        """
+        close the window
+        """
         self.close()
 
