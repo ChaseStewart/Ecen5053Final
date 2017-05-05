@@ -42,7 +42,7 @@ class EnrollWindow(QtGui.QMainWindow):
 
         #add background image
         palette	= QtGui.QPalette()
-        palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Access_RPi/enroll.jpg")))
+        palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Assets/Access/enroll.jpg")))
         self.setPalette(palette)
 
         #create Add User button

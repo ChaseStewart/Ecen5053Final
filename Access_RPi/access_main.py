@@ -255,7 +255,7 @@ class Access(QtGui.QMainWindow):
 
         #add background image
         palette	= QtGui.QPalette()
-        palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Access_RPi/background.jpg")))
+        palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Assets/Access/background.jpg")))
         self.setPalette(palette)
 
 	
@@ -422,6 +422,8 @@ class Access(QtGui.QMainWindow):
         uname =self.input1.text()
         passwd=self.input2.text()
 
+        self.input1.clear()
+        self.input2.clear()
         #publish to topic
         self.pubUserPass(uname, passwd)
         
