@@ -45,23 +45,17 @@ class Access(QtGui.QMainWindow):
         self.window_state = AccessState.ARM_WINDOW
         self.set_window_to_state()
 
-<<<<<<< HEAD
+
 	# AWS device variables
-=======
-	# set AWS vars
->>>>>>> fe327e1b643038fa31e57d22d70099ec0c67aca2
         self.rootCAPath="/home/pi/Desktop/root-CA.crt"
         self.privateKeyPath="/home/pi/Desktop/Access01.private.key"
         self.certificatePath="/home/pi/Desktop/Access01.cert.pem"
         self.host="a1qhmcyp5eh8yq.iot.us-west-2.amazonaws.com"
         self.setupAWS()
 
-<<<<<<< HEAD
-        self.WORK_PERIOD = 2000 
-=======
+
 	# set SQS processing vars
         self.WORK_PERIOD = 500 
->>>>>>> fe327e1b643038fa31e57d22d70099ec0c67aca2
         self.myTimer = QTimer()
         self.myTimer.timeout.connect(self.processSQS)
         self.myTimer.start(self.WORK_PERIOD)
@@ -124,12 +118,10 @@ class Access(QtGui.QMainWindow):
                 acked_messages.append(msg['ReceiptHandle'])
                 json_body = json.loads(body)
                 print(json_body)
-
-<<<<<<< HEAD
+                
 		# if the message is to rm a fingerprint, do this
-=======
                 #decode json for remove index
->>>>>>> fe327e1b643038fa31e57d22d70099ec0c67aca2
+
                 if json_body['type'] == 'rm_index':
                         user_id = json_body['user_id']
                         try:
@@ -146,11 +138,9 @@ class Access(QtGui.QMainWindow):
                         except:
                             print("Error- message could not be handled!")
 
-<<<<<<< HEAD
 		# if the message is a login, set the login state accordingly
-=======
                 #decode json for login
->>>>>>> fe327e1b643038fa31e57d22d70099ec0c67aca2
+
                 elif json_body['type'] == 'login':
                         
                         arm_state = json_body['arm_state']
@@ -165,10 +155,6 @@ class Access(QtGui.QMainWindow):
                         else:
                             self.state.setText("")
                             self.user_data.setText("Welcome, %s!" % user)
-<<<<<<< HEAD
-                            #self.enrollWindow.instructions.setText("Welcome, %s!" % user)
-=======
->>>>>>> fe327e1b643038fa31e57d22d70099ec0c67aca2
                             self.window_state = AccessState.DISARM_WINDOW
                             self.set_window_to_state()
                             self.enrollWindow.instructions.setText("Welcome, %s!" % user)
@@ -269,7 +255,7 @@ class Access(QtGui.QMainWindow):
 
         #add background image
         palette	= QtGui.QPalette()
-        palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Access_RPi/background.jpg")))
+        palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Assets/Access/background.jpg")))
         self.setPalette(palette)
 
 	
@@ -282,6 +268,7 @@ class Access(QtGui.QMainWindow):
 	# Create user-name label
         self.user_data=QtGui.QLabel(self)
         self.user_data.setFont(font)
+        self.user_data.setStyleSheet("color: white")
         self.user_data.setText("")
         
 
@@ -372,12 +359,8 @@ class Access(QtGui.QMainWindow):
 
     def set_window_to_state(self):
         """
-<<<<<<< HEAD
         control the state machine of the application
         the pattern for this is first set self.window_state then call this function
-=======
-            switching between windows
->>>>>>> fe327e1b643038fa31e57d22d70099ec0c67aca2
         """
 
         print ("Arm state is %d" % self.window_state)
@@ -439,6 +422,8 @@ class Access(QtGui.QMainWindow):
         uname =self.input1.text()
         passwd=self.input2.text()
 
+        self.input1.clear()
+        self.input2.clear()
         #publish to topic
         self.pubUserPass(uname, passwd)
         
@@ -466,109 +451,6 @@ class Access(QtGui.QMainWindow):
         self.pubFingerprint(state="Failure", uname=None)
         return
 
-
- 
-<<<<<<< HEAD
-#    @gen.coroutine
-#    def connect(self):
-#        """
-#        Connect to the websockets server
-#        on our ec2 server
-#        """
-#
-#        #print "trying to connect"
-#
-#        try:
-#            self.ws = yield websocket_connect(self.url)
-#        except Exception, e:
-#            print "connection error"
-#        else:
-#            #print "connected"
-#            pass
-#
-#
-#    def sendAndRead(self):
-#        """ 
-#        query for login and arm/disarm status and read responses
-#        """
-#
-#        #print("Sending messages!")
-#        self.toggle = 1 - self.toggle
-#
-#        if self.toggle == 1:
-#		self.ws.write_message("login_status")
-#		self.readInput()
-#        else:
-#		self.ws.write_message("arm_status")
-#		self.readInput()
-#
-#
-#
-#    @gen.coroutine
-#    def readInput(self):
-#        """
-#        read a message back from websockets and set update
-#        """
-# 
-#        try:
-#            msg = yield self.ws.read_message()
-#        except:
-#            self.drop_count += 1
-#            if self.drop_count >= 2:
-#		    self.statusBar().showMessage('Connection Error!')
-#                    self.user_data.setText("Disconnected!")
-#                    self.state.setText("")
-#            return
-#
-#        self.drop_count = 0
-#
-#        # data is sent 
-#        self.statusBar().clearMessage()
-#        indata = msg.split(":")
-#        if indata[0] == "name" :
-#            self.user_data.setText("Welcome, "+indata[1])
-#        elif indata[0] == "state" :
-#            self.state.setText("Arm/Disarm state is: "+indata[1])
-#        #print ("Received Data: '"+indata[1]+"'")
-#
-#
-#        
-#    def keep_alive(self):
-#        """ 
-#        heartbeat function of program- send commands
-#        and receive data to display
-#        """
-#        
-#        # reconnect if connection has been lost
-#        if self.ws is None:
-#            self.connect()
-#        else:
-#            if self.first_time:
-#                self.first_time = False
-#            else:
-#                try:
-#                    self.ioloop.start()
-#                except:
-#                    self.connect()
-#            
-#            self.sendAndRead()
-#            
-#            self.ioloop.stop()
-#            self.my_p_callback.stop()
-#            QTimer.singleShot(self.gui_timeout, self.poll_websockets)
-#
-#
-#
-#    def poll_websockets(self):
-#        """ Take control from GUI for websockets"""
-#
-#        self.my_p_callback.start()
-#        self.ioloop.start()
-
-
-
-=======
->>>>>>> fe327e1b643038fa31e57d22d70099ec0c67aca2
 if __name__ == "__main__":
     """ 
     Run program if called as main function

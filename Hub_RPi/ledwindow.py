@@ -33,7 +33,7 @@ class LEDWindow(QtGui.QMainWindow):
 
         #add background image
         palette	= QtGui.QPalette()
-        palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Hub_RPi/lights.jpg")))
+        palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Assets/Hub/lights.jpg")))
         self.setPalette(palette)
         
 
