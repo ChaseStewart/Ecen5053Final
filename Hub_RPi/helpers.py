@@ -1,6 +1,10 @@
 #!/usr/bin/python
 
 
+"""
+A set of enumeration classes to keep code clean
+"""
+
 class WindowState(object):
     """
     State machine for the hub window states
@@ -25,4 +29,5 @@ class VoiceState(object):
     """
     RUNNING = 0
     STOP    = 1
+    ERROR   = 2
 

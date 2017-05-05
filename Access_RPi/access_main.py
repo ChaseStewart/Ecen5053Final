@@ -45,12 +45,14 @@ class Access(QtGui.QMainWindow):
         self.window_state = AccessState.ARM_WINDOW
         self.set_window_to_state()
 
-	# set AWS vars
+
+	# AWS device variables
         self.rootCAPath="/home/pi/Desktop/root-CA.crt"
         self.privateKeyPath="/home/pi/Desktop/Access01.private.key"
         self.certificatePath="/home/pi/Desktop/Access01.cert.pem"
         self.host="a1qhmcyp5eh8yq.iot.us-west-2.amazonaws.com"
         self.setupAWS()
+
 
 	# set SQS processing vars
         self.WORK_PERIOD = 500 
@@ -61,6 +63,10 @@ class Access(QtGui.QMainWindow):
 
 
     def setupAWS(self):
+        """
+        configure the AWS publish service to be able to publish
+        also configure boto3 to read from the Hub_Queue SQS service
+        """
 
         self.myAWSIoTMQTTClient = AWSIoTMQTTClient("basicPubSub")
         self.myAWSIoTMQTTClient.configureEndpoint(self.host, 8883)
@@ -83,6 +89,7 @@ class Access(QtGui.QMainWindow):
             print("Need to configure AWS- exit and run 'aws configure' ")
             sys.exit(-1)
 
+	# self.queue will be used in process SQS
         self.client  = self.session.client('sqs')
 	self.queue   = self.client.get_queue_url(QueueName="Access_Messages")['QueueUrl']
 
@@ -111,8 +118,10 @@ class Access(QtGui.QMainWindow):
                 acked_messages.append(msg['ReceiptHandle'])
                 json_body = json.loads(body)
                 print(json_body)
-
+                
+		# if the message is to rm a fingerprint, do this
                 #decode json for remove index
+
                 if json_body['type'] == 'rm_index':
                         user_id = json_body['user_id']
                         try:
@@ -129,7 +138,9 @@ class Access(QtGui.QMainWindow):
                         except:
                             print("Error- message could not be handled!")
 
+		# if the message is a login, set the login state accordingly
                 #decode json for login
+
                 elif json_body['type'] == 'login':
                         
                         arm_state = json_body['arm_state']
@@ -348,7 +359,8 @@ class Access(QtGui.QMainWindow):
 
     def set_window_to_state(self):
         """
-            switching between windows
+        control the state machine of the application
+        the pattern for this is first set self.window_state then call this function
         """
 
         print ("Arm state is %d" % self.window_state)
@@ -389,14 +401,12 @@ class Access(QtGui.QMainWindow):
 	
 	# for a failure, deny access
         if self.verify_result is None:
-    		#self.pubAccessState("Armed")
         	self.statusBar().showMessage("Access Denied")
         	time.sleep(1)
         	self.statusBar().clearMessage()
 
 	# for a success publish a logged-in user
         else:
-    		#self.pubAccessState("Disarmed")
                 self.pubFingerprint(state="Success", uname=self.verify_result)
 		self.hide()
         	self.newWindow= EnrollWindow(self)
@@ -439,8 +449,6 @@ class Access(QtGui.QMainWindow):
         self.pubFingerprint(state="Failure", uname=None)
         return
 
-
- 
 if __name__ == "__main__":
     """ 
     Run program if called as main function

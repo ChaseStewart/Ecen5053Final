@@ -18,10 +18,21 @@ from PyQt4.QtGui import QSound
 from helpers import VoiceState
 
 class Hub_voice(QtGui.QMainWindow):
+
+    """
+      Detects the default device and uses Goople Voice API
+    """
     
+
     def __init__(self,parent = None):
 
+        """
+        start listeneing
+        """
+    
         super(Hub_voice,self).__init__(parent)
+
+        #var for the words it is searching for
         self.speech_text = None
         self.name     = None
         self.light_on = None
@@ -36,29 +47,41 @@ class Hub_voice(QtGui.QMainWindow):
         self.count = 0
         self.parent = parent
 	self.IS_RUNNING = VoiceState.RUNNING
-        #self.listen_once()
-
-        self.parent = parent
 
     def listen_once(self):
-        # Record Audio
-        self.speech_text = sr.Recognizer()
-        with sr.Microphone() as source:
-            self.speech_text.adjust_for_ambient_noise(source)
-            print("set minimum energy threshold to {}".format(self.speech_text.energy_threshold)) 
 
-            print("Say something!")
-            audio = self.speech_text.listen(source)
-            print("Said something!")
- 	    self.process_voice(audio)
+        """
+        select default input and record
+        """
+        # Record Audio
+        try:
+            self.speech_text = sr.Recognizer()
+            with sr.Microphone() as source:
+                self.speech_text.adjust_for_ambient_noise(source)
+                print("set minimum energy threshold to {}".format(self.speech_text.energy_threshold)) 
+
+                print("Say something!")
+                audio = self.speech_text.listen(source)
+                print("Said something!")
+                self.process_voice(audio)
+
+        #when no mic is attached
+        except Exception as e:
+            print e
+            self.IS_RUNNING = VoiceState.ERROR
+            
 
 		
     def process_voice(self, audio):
-        # Speech recognition using Google Speech Recognition
+
+            """
+            Process the audio recorded and send commands
+            """
+            
+            # Speech recognition using Google Speech Recognition
             try:
                 Resp_Text = self.speech_text.recognize_google(audio)
                 print("You said: " + Resp_Text)
-                #self.name = re.search('purple',Resp_Text.lower())
 
 		# LED commands
                 self.light_red     = re.search('lights red',  Resp_Text.lower())
@@ -89,6 +112,7 @@ class Hub_voice(QtGui.QMainWindow):
                         time.sleep(2)
 
 		if self.light_red != None:
+                    
 		    jsonData = {}
 		    jsonData['type']  = 'led'
 		    jsonData['blue']  = 0
@@ -101,6 +125,7 @@ class Hub_voice(QtGui.QMainWindow):
                     time.sleep(0.1)	
 	
                 if self.light_blue != None:
+                    
 		    jsonData = {}
 		    jsonData['type']  = 'led'
 		    jsonData['blue']  = 255
@@ -113,6 +138,7 @@ class Hub_voice(QtGui.QMainWindow):
                     time.sleep(0.1)	
 		
                 if self.light_green != None or self.light_green_2 != None:
+                    
 		    jsonData = {}
 		    jsonData['type']  = 'led'
 		    jsonData['blue']  = 0
@@ -125,6 +151,7 @@ class Hub_voice(QtGui.QMainWindow):
                     time.sleep(0.1)	
                         
                 if self.music != None:
+                    
                     fnames = os.listdir("/media/pi/B214-AB4E/Testing")
                     print fnames[self.count]
                     path = "mpg321 -K /media/pi/B214-AB4E/Testing/"+fnames[self.count]+" &"
@@ -183,6 +210,7 @@ class Hub_voice(QtGui.QMainWindow):
 	
                 
 if __name__ == "__main__":
+    
     """ Run program if called as main function """
     app = QtGui.QApplication(sys.argv)
     voice_control=Hub_voice()

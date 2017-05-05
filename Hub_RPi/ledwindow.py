@@ -27,6 +27,16 @@ class LEDWindow(QtGui.QMainWindow):
 
     def initUI(self):
 
+        """
+        Add the elements to GUI
+        """
+
+        #add background image
+        palette	= QtGui.QPalette()
+        palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Assets/Hub/lights.jpg")))
+        self.setPalette(palette)
+        
+
 	# create QT font
         self.font = QtGui.QFont()
         self.font.setFamily(QtCore.QString.fromUtf8("Helvetica"))
@@ -37,11 +47,12 @@ class LEDWindow(QtGui.QMainWindow):
         self.label=QtGui.QLabel(self)
         self.label.setFont(self.font)
         self.label.setText("LED Controls")
-	self.label.setStyleSheet("color: blue")
+	self.label.setStyleSheet("color: white")
         
 	self.LEDredInput = QtGui.QLineEdit(self)
 	self.LEDredInput.setPlaceholderText("Set red val between 0 and 255")
 	self.LEDredLabel = QtGui.QLabel(self)
+	self.LEDredLabel.setStyleSheet("color: white")
 	self.LEDredLabel.setText("Red")
 	self.LEDred = QtGui.QHBoxLayout()
 	self.LEDred.addWidget(self.LEDredInput)
@@ -50,6 +61,7 @@ class LEDWindow(QtGui.QMainWindow):
 	self.LEDgreenInput = QtGui.QLineEdit(self)
 	self.LEDgreenInput.setPlaceholderText("Set green val between 0 and 255")
 	self.LEDgreenLabel = QtGui.QLabel(self)
+	self.LEDgreenLabel.setStyleSheet("color: white")
 	self.LEDgreenLabel.setText("Green")
 	self.LEDgreen = QtGui.QHBoxLayout()
 	self.LEDgreen.addWidget(self.LEDgreenInput)
@@ -58,6 +70,7 @@ class LEDWindow(QtGui.QMainWindow):
 	self.LEDblueInput = QtGui.QLineEdit(self)
 	self.LEDblueInput.setPlaceholderText("Set blue val between 0 and 255")
 	self.LEDblueLabel = QtGui.QLabel(self)
+	self.LEDblueLabel.setStyleSheet("color: white")
 	self.LEDblueLabel.setText("Blue")
 	self.LEDblue = QtGui.QHBoxLayout()
 	self.LEDblue.addWidget(self.LEDblueInput)
@@ -91,6 +104,10 @@ class LEDWindow(QtGui.QMainWindow):
 
 
     def verifyColors(self):
+
+        """
+        Validate if value entered is a valid value
+        """
 	if self.LEDgreenInput.text() == "" or self.LEDredInput.text() == "" or self.LEDblueInput.text() == "":
 		self.statusBar().setStyleSheet("color: red; font-size:18pt")
 		self.statusBar().showMessage("must fill out all three values")
@@ -126,11 +143,17 @@ class LEDWindow(QtGui.QMainWindow):
 
 
     def clearEntries(self):
+        """
+        Clear the values entered
+        """
         self.LEDgreenInput.clear()
         self.LEDblueInput.clear()
         self.LEDredInput.clear()
 
     def SubmitLED(self):
+        """
+        Publish the values to topic
+        """
         if self.verifyColors():
             jsonData = {}
             jsonData['type']  = 'led'
@@ -151,11 +174,17 @@ class LEDWindow(QtGui.QMainWindow):
 
 
     def goBack(self):
+        """
+        Navigate to home page
+        """
         self.parent.window_state = WindowState.MAIN_WINDOW
         self.parent.set_window_to_state()
 
 
 
     def teardown(self):
+        """
+        close the window
+        """
         self.close()
 

@@ -1,10 +1,15 @@
 var http = require('http');
 var deviceModule = require('/home/centos/node_modules/aws-iot-device-sdk').device;
 
+// This node.js program listens for a AJAX call from the website with RGB values for the LED
+// when it gets a message, it publishes to the AWS IOT framework
+
+
+
 var common = '/home/centos/'
 
 function publishRGB(Red,Green,Blue){
-
+	// setup AWS
    	clientIdDefault = 'nouser' + (Math.floor((Math.random() * 100000) + 1));
 
 	const device = deviceModule({
@@ -21,6 +26,7 @@ function publishRGB(Red,Green,Blue){
 	   debug: false
 	});
 
+	// Publish the LED values to AccessControl/set_leds
 	device.publish('AccessControl/set_leds', JSON.stringify({"type":"led","red":Red, "green":Green, "blue":Blue	}));
 
 	//
@@ -55,18 +61,21 @@ function publishRGB(Red,Green,Blue){
 	});
 }
 
+// create the listener
 http.createServer(function (request, response) {
+	// allow cross- origin requests
 	response.writeHead(200, {
 	    'Content-Type': 'text/plain',
 	    'Access-Control-Allow-Origin' : '*',
 	});
 
 	var body = '';
-
+	// get data one chunk at a time
 	request.on('data', function(chunk){
 		body += chunk;
 	
 	});
+	// once all data is received, publish it
 	request.on('end', function(data){
 		var my_json = JSON.parse(body)
 		var red   = my_json['r'];
@@ -76,6 +85,9 @@ http.createServer(function (request, response) {
 		console.log(LED_string);
 		publishRGB(red, green, blue);
 	});
+	// send back a stupid response
 	response.end("THANKS FOR THE INFO");
 }).listen(8080);
+
+// print a lil message
 console.log('Listening on port 8080')

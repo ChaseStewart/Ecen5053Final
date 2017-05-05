@@ -28,6 +28,11 @@ class LockedWindow(QtGui.QMainWindow):
         Initialize the UI to simply show that the system is armed
         """
 
+        #add background image
+        palette	= QtGui.QPalette()
+        palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Assets/Hub/securitybackground.jpg")))
+        self.setPalette(palette)
+
 	# create QT font
         self.font = QtGui.QFont()
         self.font.setFamily(QtCore.QString.fromUtf8("Helvetica"))
