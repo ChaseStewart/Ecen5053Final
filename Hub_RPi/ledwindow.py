@@ -21,8 +21,17 @@ class LEDWindow(QtGui.QMainWindow):
         self.initUI()
         self.parent = parent
 
+	self.red = None
+	self.blue = None
+	self.green = None
 
     def initUI(self):
+
+        #add background image
+        palette	= QtGui.QPalette()
+        palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Hub_RPi/lights.jpg")))
+        self.setPalette(palette)
+        
 
 	# create QT font
         self.font = QtGui.QFont()
@@ -31,27 +40,56 @@ class LEDWindow(QtGui.QMainWindow):
         self.font.setPointSize(20)
 
 	# Create user-name label
-        self.armed=QtGui.QLabel(self)
-        self.armed.setFont(self.font)
-        self.armed.setText("LED Controls")
-	self.armed.setStyleSheet("color: blue")
+        self.label=QtGui.QLabel(self)
+        self.label.setFont(self.font)
+        self.label.setText("LED Controls")
+	self.label.setStyleSheet("color: white")
         
-        # put buttons + status in a vbox
-        self.LEDon=QtGui.QPushButton("LEDs On",self)
-        self.LEDon.clicked.connect(self.LEDsOn)
+	self.LEDredInput = QtGui.QLineEdit(self)
+	self.LEDredInput.setPlaceholderText("Set red val between 0 and 255")
+	self.LEDredLabel = QtGui.QLabel(self)
+	self.LEDredLabel.setStyleSheet("color: white")
+	self.LEDredLabel.setText("Red")
+	self.LEDred = QtGui.QHBoxLayout()
+	self.LEDred.addWidget(self.LEDredInput)
+	self.LEDred.addWidget(self.LEDredLabel)
+	
+	self.LEDgreenInput = QtGui.QLineEdit(self)
+	self.LEDgreenInput.setPlaceholderText("Set green val between 0 and 255")
+	self.LEDgreenLabel = QtGui.QLabel(self)
+	self.LEDgreenLabel.setStyleSheet("color: white")
+	self.LEDgreenLabel.setText("Green")
+	self.LEDgreen = QtGui.QHBoxLayout()
+	self.LEDgreen.addWidget(self.LEDgreenInput)
+	self.LEDgreen.addWidget(self.LEDgreenLabel)
+	
+	self.LEDblueInput = QtGui.QLineEdit(self)
+	self.LEDblueInput.setPlaceholderText("Set blue val between 0 and 255")
+	self.LEDblueLabel = QtGui.QLabel(self)
+	self.LEDblueLabel.setStyleSheet("color: white")
+	self.LEDblueLabel.setText("Blue")
+	self.LEDblue = QtGui.QHBoxLayout()
+	self.LEDblue.addWidget(self.LEDblueInput)
+	self.LEDblue.addWidget(self.LEDblueLabel)
 
-        self.LEDoff=QtGui.QPushButton("LEDs Off",self)
-        self.LEDoff.clicked.connect(self.LEDsOff)
+	# create submission button
+	self.submit=QtGui.QPushButton("Submit",self)
+        self.submit.clicked.connect(self.SubmitLED)
         
         # put buttons + status in a vbox
         self.goback=QtGui.QPushButton("Back",self)
         self.goback.clicked.connect(self.goBack)
         
-        wid = QtGui.QWidget(self)
+	self.statusBar()
+	self.statusBar().setStyleSheet("color: red; font-size:18pt")
+        
+	wid = QtGui.QWidget(self)
 	vbox = QtGui.QVBoxLayout()
-        vbox.addWidget(self.armed)
-        vbox.addWidget(self.LEDon)
-        vbox.addWidget(self.LEDoff)
+        vbox.addWidget(self.label)
+        vbox.addLayout(self.LEDred)
+        vbox.addLayout(self.LEDgreen)
+        vbox.addLayout(self.LEDblue)
+        vbox.addWidget(self.submit)
         vbox.addWidget(self.goback)
 	wid.setLayout(vbox)
         self.setCentralWidget(wid)
@@ -61,14 +99,63 @@ class LEDWindow(QtGui.QMainWindow):
         self.setWindowTitle('System LED control')
 
 
+    def verifyColors(self):
+	if self.LEDgreenInput.text() == "" or self.LEDredInput.text() == "" or self.LEDblueInput.text() == "":
+		self.statusBar().setStyleSheet("color: red; font-size:18pt")
+		self.statusBar().showMessage("must fill out all three values")
+		return False
+	try:
+		red_test   = int(self.LEDredInput.text())
+		green_test = int(self.LEDgreenInput.text())
+		blue_test  = int(self.LEDblueInput.text())
+	except:
+		self.statusBar().setStyleSheet("color: red; font-size:18pt")
+		self.statusBar().showMessage("entered values must be integers")
+		return False
+	
+	if red_test > 255 or red_test < 0:
+		self.statusBar().setStyleSheet("color: red; font-size:18pt")
+		self.statusBar().showMessage("Red val must be between 0 and 255")
+		return False
 
-    def LEDsOn(self):
-        self.armed.setText("TODO Set LEDs ON")
+	if green_test > 255 or green_test < 0:
+		self.statusBar().setStyleSheet("color: red; font-size:18pt")
+		self.statusBar().showMessage("Blue val must be between 0 and 255")
+		return False
+
+	if blue_test > 255 or blue_test < 0:
+		self.statusBar().setStyleSheet("color: red; font-size:18pt")
+		self.statusBar().showMessage("Green val must be between 0 and 255")
+		return False
+	else:
+		self.red   = red_test
+		self.blue  = blue_test
+		self.green = green_test
+		return True		
 
 
+    def clearEntries(self):
+        self.LEDgreenInput.clear()
+        self.LEDblueInput.clear()
+        self.LEDredInput.clear()
 
-    def LEDsOff(self):
-        self.armed.setText("TODO Set LEDs OFF")
+    def SubmitLED(self):
+        if self.verifyColors():
+            jsonData = {}
+            jsonData['type']  = 'led'
+            jsonData['blue']  = self.blue
+            jsonData['red']   = self.red
+            jsonData['green'] = self.green
+            strData = json.dumps(jsonData)
+
+            try:
+                self.parent.myAWSIoTMQTTClient.publish("AccessControl/set_leds", strData, 1)
+		self.statusBar().setStyleSheet("color: black; font-size:18pt")
+                self.statusBar().showMessage("published successfully!")
+                self.clearEntries()
+            except:
+		self.statusBar().setStyleSheet("color: red; font-size:18pt")
+                self.statusBar().showMessage("LED publish failed!")
 
 
 

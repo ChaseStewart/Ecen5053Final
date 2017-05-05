@@ -7,17 +7,18 @@ ADDRESS = 'localhost:7890'
 
 
 
-"""
-This script generates a simple and tantalizing pattern to test the LEDs
-"""
-
 def rotate(l,n):
 	"""
-	Helper function
+	Rotate an array
+	This function thanks to stackoverflow.com/questions/9457832/python-list-rotation
 	"""
-	# thanks to stackoverflow.com/questions/9457832/python-list-rotation
 	return l[n:] + l[:n]
 
+
+
+"""
+START the program
+"""
 
 client = opc.Client(ADDRESS)
 
@@ -45,7 +46,7 @@ my_pixels.append(rotate(intermediate, 1))
 my_pixels.append(rotate(intermediate, 2))
 i = 0
 
-# forever rotate colors
+# rotate between the three settings within my_pixels
 while True:
 	if client.put_pixels(my_pixels[i], channel=0):
 		pass

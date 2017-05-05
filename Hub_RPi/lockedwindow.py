@@ -6,9 +6,12 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import QTimer
 from helpers import WindowState
 
+
+
 class LockedWindow(QtGui.QMainWindow):
     """
     This is the window that should be shown when the device is locked
+    It has no functionality at all- Duhhh!
     """
 
     def __init__(self, parent=None):
@@ -21,6 +24,14 @@ class LockedWindow(QtGui.QMainWindow):
 
 
     def initUI(self):
+        """
+        Initialize the UI to simply show that the system is armed
+        """
+
+        #add background image
+        palette	= QtGui.QPalette()
+        palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Hub_RPi/securitybackground.jpg")))
+        self.setPalette(palette)
 
 	# create QT font
         self.font = QtGui.QFont()
@@ -47,6 +58,11 @@ class LockedWindow(QtGui.QMainWindow):
         self.setWindowTitle('System is Armed')
 
 
+
     def teardown(self):
+        """
+        Remove this class when torn down
+        """
+
         self.close()
 

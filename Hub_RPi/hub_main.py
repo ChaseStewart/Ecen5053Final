@@ -8,14 +8,15 @@ from PyQt4.QtCore import QTimer
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 from boto3.session import Session
 
-from time import time
+from time import time, sleep
 
 # all windows
-from helpers import WindowState
+from helpers import WindowState, VoiceState
 from lockedwindow import LockedWindow
 from ledwindow import LEDWindow
 from statswindow import StatsWindow
-#from hub_voice import Hub_voice
+from hub_voice import Hub_voice
+
 
 
 class Hub(QtGui.QMainWindow):
@@ -43,6 +44,7 @@ class Hub(QtGui.QMainWindow):
         self.lockscreen  = None
         self.ledscreen   = None
         self.statsscreen = None
+        self.hub_voice   = None
 
 	# connection variables
         self.first_time  = True
@@ -79,6 +81,8 @@ class Hub(QtGui.QMainWindow):
         self.window_state = WindowState.LOCK_WINDOW
         self.set_window_to_state()
 
+
+
     def setupAWS(self):
 
         # Setup AWS IoT basics
@@ -112,6 +116,7 @@ class Hub(QtGui.QMainWindow):
         Select a window to display using enums from Helpers
         """
 
+	""" FIRST PERFORM TEARDOWN """
         print("Changing state to %d" % self.window_state)
 
         if self.lockscreen != None and self.window_state != WindowState.LOCK_WINDOW:
@@ -119,7 +124,7 @@ class Hub(QtGui.QMainWindow):
             self.lockscreen.teardown()
             self.lockscreen = None
 
-        if self.window_state != WindowState.MAIN_WINDOW:
+        if self.window_state != WindowState.MAIN_WINDOW and self.window_state != WindowState.VOICE_WINDOW:
             if self.start_armed:
                 self.start_armed = False
             else:
@@ -136,6 +141,10 @@ class Hub(QtGui.QMainWindow):
             self.statsscreen.teardown()
             self.statsscreen = None
 
+
+
+	""" NOW SET DATA FOR CURRENT WINDOW """
+
         if self.window_state == WindowState.LOCK_WINDOW and self.lockscreen == None:
             print("Showing Lockscreen")
             self.lockscreen = LockedWindow(self)
@@ -144,6 +153,17 @@ class Hub(QtGui.QMainWindow):
         if self.window_state == WindowState.MAIN_WINDOW:
             print("Showing Main")
             self.show()
+            self.LED_btn.show()
+            self.Voice_btn.show()
+            self.Stats_btn.show()
+            self.Logout_btn.show()
+
+        if self.window_state == WindowState.VOICE_WINDOW:
+            print("Hiding Buttons")
+            self.LED_btn.hide()
+            self.Voice_btn.hide()
+            self.Stats_btn.hide()
+            self.Logout_btn.hide()
 
         if self.window_state == WindowState.LED_WINDOW and self.ledscreen == None:
             print("Showing LEDscreen")
@@ -180,6 +200,8 @@ class Hub(QtGui.QMainWindow):
                 acked_messages.append(msg['ReceiptHandle'])
 		print body
                 json_body = json.loads(body)
+
+		# process login type messages and set access state
 		if json_body['type'] == 'login':               
  
 			arm_state = json_body['arm_state']
@@ -198,24 +220,25 @@ class Hub(QtGui.QMainWindow):
 			    self.window_state = WindowState.MAIN_WINDOW 
 			    self.set_window_to_state()
 
-
+		# process overhead type messages and set latency
 		elif json_body['type'] == 'overhead':
 			if self.window_state == WindowState.STATS_WINDOW:
 				self.ws_latency   = json_body['ws_lat']
 				self.mqtt_latency = json_body['mqtt_lat']
 				self.coap_latency = json_body['coap_lat']
 
-        			
+        			# call update to stats grpah
 				if self.statsscreen != None:
 					self.statsscreen.latencyStats(self.ws_latency, self.coap_latency, self.mqtt_latency)
 
-
+		# process LED type messages and send websocket to FCServer
 		elif json_body['type'] == 'led':
 			if self.window_state != WindowState.LOCK_WINDOW:
 				self.red   = json_body['red']
 				self.blue  = json_body['blue']
 				self.green = json_body['green']
 
+				# format and send WS message
 				self.setLEDs(self.red, self.green, self.blue)
 
             # Now delete the ack'ed message
@@ -234,6 +257,11 @@ class Hub(QtGui.QMainWindow):
         Initialize + configure all QT modules used in the GUI
         And place them on the screen in the application
         """
+        #add background image
+        palette	= QtGui.QPalette()
+        palette.setBrush(QtGui.QPalette.Background,QtGui.QBrush(QtGui.QPixmap("/home/pi/Ecen5053Final/Hub_RPi/background.png")))
+        self.setPalette(palette)
+
 	
 	# create QT font
         font = QtGui.QFont()
@@ -244,11 +272,13 @@ class Hub(QtGui.QMainWindow):
 	# Create user-name label
         self.user_data=QtGui.QLabel(self)
         self.user_data.setFont(font)
+        self.user_data.setStyleSheet("color: white")
         self.user_data.setText("No Logged In User")
 
         # Create voice_status label
         self.voice_status=QtGui.QLabel(self)
         self.voice_status.setFont(font)
+        self.voice_status.setStyleSheet("color: white")
         self.voice_status.setText("Voice Mode off")
 
 	# Create status bar
@@ -262,7 +292,6 @@ class Hub(QtGui.QMainWindow):
         # Create Voice mode button
 	self.Voice_btn=QtGui.QPushButton("Voice Mode",self)
         self.Voice_btn.clicked.connect(self.setVoicemode)
-        
 
 	# Create Stats button        
 	self.Stats_btn=QtGui.QPushButton("System Stats",self)
@@ -306,12 +335,15 @@ class Hub(QtGui.QMainWindow):
         self.set_window_to_state()
 
 
+
     def setLEDPage(self):
         """
         Change the state of the Arm_status table in MySQL to 'disarmed'
         """
         self.window_state = WindowState.LED_WINDOW
         self.set_window_to_state()
+
+
     
     def setVoicemode(self):
         """
@@ -320,9 +352,50 @@ class Hub(QtGui.QMainWindow):
         
         self.voice_status.setText("Voice Mode ON")
         self.voice_status.repaint()
-        Hub_voice(self)
+        self.hub_voice = Hub_voice(self)
         
+	# change state to VOICE and set window
+	self.window_state = WindowState.VOICE_WINDOW
+        self.set_window_to_state()
         
+        # set timer for first time'   
+        QtCore.QTimer.singleShot(50, self.listenAgain) 
+
+
+ 
+    def listenAgain(self):
+	"""
+	Use a timer to give the the app time to process SQS messages between voice commands
+	"""
+        
+	# first listen
+        self.hub_voice.listen_once()
+
+	# if the command was not "end voice", schedule another listen
+	print("Hub voice State is "+str(self.hub_voice.IS_RUNNING))
+        if self.hub_voice.IS_RUNNING == VoiceState.RUNNING:
+            # set timer to run again
+            QtCore.QTimer.singleShot(400, self.listenAgain) 
+
+        elif self.hub_voice.IS_RUNNING == VoiceState.ERROR:
+            print ("Voice error")
+            
+            self.voice_status.setText("Problem with mic")
+            self.voice_status.repaint()
+            sleep(2)
+            self.window_state = WindowState.MAIN_WINDOW
+            self.set_window_to_state()
+            self.voice_status.setText("Voice Mode OFF")
+
+	# if the command was "end voice", show the buttons again and change state to MAIN
+        else:       
+	    self.window_state = WindowState.MAIN_WINDOW
+            self.set_window_to_state()
+            
+            self.voice_status.setText("Voice Mode OFF")
+
+
+ 
     def setLogoutPage(self):
         """
         Change the state of the Arm_status table in MySQL to 'disarmed'
@@ -332,19 +405,26 @@ class Hub(QtGui.QMainWindow):
         self.set_window_to_state()
 
 
+
     def setLEDs(self, red, green, blue):
+	"""
+	Take a RGB tuple, set that value for all 60 LEDs in the strip
+	"""
 
 	out_list = []
         my_tuple = (red, green, blue)
 	
+	# create a list of tuples for WS output
 	for i in range(self.num_pixels):
             out_list.append(my_tuple)
 	
+	# now try to send pixels to FCserver, else fail gracefully
 	if self.led_client.put_pixels(out_list, channel=0):
 		pass
 	else:
 		print("Not connected!")
 
+	# if using fast transition, double-send LEDs 
 	if self.fast_transition:	
 		if self.led_client.put_pixels(out_list, channel=0):
 			pass
@@ -353,118 +433,6 @@ class Hub(QtGui.QMainWindow):
 	return
 
 
-
-
-#    def testCoAP(self):
-#        endpoint = resource.Endpoint(None)
-#        protocol = coap.Coap(endpoint)
-#        client   = Agent(protocol)
-#        reactor.listenUDP(61616, protocol)
-#        reactor.run()
-#
-#    def testMQTT(self):
-#        curr_time = time()
-#        publish.single("AccessControl/MQTT_test", str(now), hostname="test.mosquitto.org") 
-#
-#    def testWebsockets(self):
-#        curr_time = time()
-#        ws = websocket.create_connection("ws://52.34.209.113:8000")
-#	ws.send(str(curr_time))
-#
-#
-#    @gen.coroutine
-#    def connect(self):
-#        """
-#        Connect to the websockets server
-#        on our ec2 server
-#        """
-#
-#        #print "trying to connect"
-#
-#        try:
-#            self.ws = yield websocket_connect(self.url)
-#        except Exception, e:
-#            print "connection error"
-#        else:
-#            #print "connected"
-#            pass
-#
-#
-#    def sendAndRead(self):
-#        """ 
-#        query for login and arm/disarm status and read responses
-#        """
-#
-#        #print("Sending messages!")
-#        self.toggle = 1 - self.toggle
-#
-#        if self.toggle == 1:
-#		self.ws.write_message("login_status")
-#		self.readInput()
-#        else:
-#		self.ws.write_message("arm_status")
-#		self.readInput()
-#
-#
-#
-#    @gen.coroutine
-#    def readInput(self):
-#        """
-#        read a message back from websockets and set update
-#        """
-# 
-#        try:
-#            msg = yield self.ws.read_message()
-#        except:
-#            self.drop_count += 1
-#            if self.drop_count >= 2:
-#		    self.statusBar().showMessage('Connection Error!')
-#                    self.user_data.setText("Disconnected!")
-#            return
-#
-#        self.drop_count = 0
-#
-#        # data is sent 
-#        self.statusBar().clearMessage()
-#        indata = msg.split(":")
-#        if indata[0] == "name" :
-#            self.user_data.setText("Welcome, "+indata[1])
-#        elif indata[0] == "state" :
-#            pass
-#        #print ("Received Data: '"+indata[1]+"'")
-#
-#
-#        
-#    def keep_alive(self):
-#        """ 
-#        heartbeat function of program- send commands
-#        and receive data to display
-#        """
-#        
-#        # reconnect if connection has been lost
-#        if self.ws is None:
-#            self.connect()
-#        else:
-#            if self.first_time:
-#                self.first_time = False
-#            else:
-#                try:
-#                    self.ioloop.start()
-#                except:
-#                    self.connect()
-#            
-#            self.sendAndRead()
-#            
-#            self.ioloop.stop()
-#            self.my_p_callback.stop()
-#            QTimer.singleShot(self.gui_timeout, self.poll_websockets)
-#            
-#
-#    def poll_websockets(self):
-#        """ Take control from GUI for websockets"""
-#
-#        self.my_p_callback.start()
-#        self.ioloop.start()
 
 
 if __name__ == "__main__":

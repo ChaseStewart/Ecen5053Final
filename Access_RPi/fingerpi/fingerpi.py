@@ -7,6 +7,10 @@ import serial
 from .base import *
 
 class FingerPi():
+
+    """
+    Sends Commands through UART
+    """
     def __init__(self,
                  port = '/dev/ttyAMA0',
                  baudrate = 9600,
@@ -142,18 +146,21 @@ class FingerPi():
             raise RuntimeError("Couldn't send packet")
 
     def Enroll1(self):
+        
         if self.sendCommand('Enroll1'):
             return [self.getResponse(), None]
         else:
             raise RuntimeError("Couldn't send packet")
 
     def Enroll2(self):
+        
         if self.sendCommand('Enroll2'):
             return [self.getResponse(), None]
         else:
             raise RuntimeError("Couldn't send packet")
 
     def Enroll3(self):
+        
         if self.sendCommand('Enroll3'):
             response = self.getResponse()
         else:
@@ -164,36 +171,42 @@ class FingerPi():
         return [response, data]
 
     def IsPressFinger(self):
+        
         if self.sendCommand('IsPressFinger'):
             return [self.getResponse(), None]
         else:
             raise RuntimeError("Couldn't send packet")
 
     def DeleteId(self, ID):
+        
         if self.sendCommand('DeleteID', ID):
             return [self.getResponse(), None]
         else:
             raise RuntimeError("Couldn't send packet")
 
     def DeleteAll(self):
+        
         if self.sendCommand('DeleteAll'):
             return [self.getResponse(), None]
         else:
             raise RuntimeError("Couldn't send packet")
 
     def Verify(self, ID):
+        
         if self.sendCommand('Verify',ID):
             return [self.getResponse(), None]
         else:
             raise RuntimeError("Couldn't send packet")
 
     def Identify(self):
+        
         if self.sendCommand('Identify'):
             return [self.getResponse(), None]
         else:
             raise RuntimeError("Couldn't send packet")
 
     def CaptureFinger(self, best_image = True):
+        
         # For enrollment use 'best_image = True'
         # For identification use 'best_image = False'
         if best_image:
